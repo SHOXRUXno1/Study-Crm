@@ -50,7 +50,10 @@ COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint
-RUN chmod +x /usr/local/bin/docker-entrypoint \
+# Defensive: strip CRLF so the script runs even if checked out on Windows
+# without our .gitattributes normalization (env would otherwise look for "sh\r").
+RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint \
+    && chmod +x /usr/local/bin/docker-entrypoint \
     && mkdir -p /app/uploads \
     && chown -R app:app /app
 
