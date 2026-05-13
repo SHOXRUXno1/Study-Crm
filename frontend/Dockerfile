@@ -4,8 +4,10 @@
 # ============================================================
 FROM node:20-alpine AS builder
 
+# NB: do NOT set NODE_ENV=production here — `npm ci` would then skip
+# devDependencies, and `vite` lives in devDependencies. Build runs in dev mode;
+# the runtime image is nginx, so node + sources are dropped anyway.
 ENV CI=true \
-    NODE_ENV=production \
     npm_config_update_notifier=false \
     npm_config_fund=false
 
