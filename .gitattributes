@@ -1,0 +1,26 @@
+# Normalize EOL: store as LF in repo, check out as native on Windows.
+* text=auto eol=lf
+
+# Always LF for shell scripts so Linux containers can run them on Windows hosts.
+*.sh        text eol=lf
+*.py        text eol=lf
+*.ts        text eol=lf
+*.tsx       text eol=lf
+*.js        text eol=lf
+*.jsx       text eol=lf
+*.json      text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+Dockerfile  text eol=lf
+*.conf      text eol=lf
+
+# Binary types — never normalize.
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.webp      binary
+*.gif       binary
+*.ico       binary
+*.pdf       binary
+*.woff      binary
+*.woff2     binary

@@ -1,0 +1,67 @@
+# ============================================================
+# Local development & production-shaped stack.
+#   docker compose up --build
+# Single source of truth for ports, networks and volumes.
+# ============================================================
+
+name: study-center
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-study}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-study_local_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-study}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    expose:
+      - "5432"
+    # Uncomment to expose Postgres on the host (e.g. for psql / DBeaver):
+    # ports:
+    #   - "5432:5432"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: study-center/backend:dev
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Override DATABASE_URL so it points at the compose-internal Postgres.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-study}:${POSTGRES_PASSWORD:-study_local_dev}@db:5432/${POSTGRES_DB:-study}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - uploads:/app/uploads
+    expose:
+      - "8000"
+    # Uncomment to talk to the API directly from the host:
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: study-center/frontend:dev
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+
+volumes:
+  pgdata:
+  uploads:
