@@ -27,5 +27,3 @@ tests/
 README.md
 .gitignore
 .dockerignore
-Dockerfile
-docker-entrypoint.sh
