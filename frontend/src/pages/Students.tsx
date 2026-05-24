@@ -10,6 +10,7 @@ import {
   X, Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ApiError } from "@/lib/api";
 
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -141,7 +142,7 @@ export default function Students() {
       toast.success(t("students.deleteSuccess"));
       setDeleteTarget(null);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error");
+      toast.error(e instanceof Error ? e.message : t("common.unknownError"));
     }
   }
 
@@ -783,7 +784,7 @@ function StudentDialog({
       }
       onClose();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error");
+      toast.error(e instanceof Error ? e.message : t("common.unknownError"));
     }
   }
 

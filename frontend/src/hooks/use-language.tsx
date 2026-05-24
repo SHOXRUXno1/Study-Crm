@@ -930,6 +930,7 @@ const translations: Record<string, Record<Language, string>> = {
 
   "common.apply": { en: "Apply", ru: "Применить", uz: "Qo'llash" },
   "common.million": { en: "M", ru: "млн", uz: "mln" },
+  "common.unknownError": { en: "An unexpected error occurred", ru: "Произошла неизвестная ошибка", uz: "Noma'lum xatolik yuz berdi" },
   "date.from": { en: "From", ru: "От", uz: "Dan" },
   "date.to": { en: "To", ru: "До", uz: "Gacha" },
   "date.pickDate": { en: "date", ru: "дата", uz: "sana" },

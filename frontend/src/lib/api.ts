@@ -74,6 +74,12 @@ async function request<T>(
           message = data.detail;
         } else if (typeof data.detail === "object" && data.detail !== null && typeof (data.detail as { message?: unknown }).message === "string") {
           message = (data.detail as { message: string }).message;
+        } else if (Array.isArray(data.detail) && data.detail.length > 0) {
+          // FastAPI 422: [{ loc: [...], msg: "...", type: "..." }]
+          message = data.detail
+            .map((e: { msg?: string }) => e.msg ?? "")
+            .filter(Boolean)
+            .join("; ");
         }
       }
     } catch { /* ignore */ }
@@ -119,6 +125,12 @@ async function requestForm<T>(
           typeof (data.detail as { message?: unknown }).message === "string"
         ) {
           message = (data.detail as { message: string }).message;
+        } else if (Array.isArray(data.detail) && data.detail.length > 0) {
+          // FastAPI 422: [{ loc: [...], msg: "...", type: "..." }]
+          message = data.detail
+            .map((e: { msg?: string }) => e.msg ?? "")
+            .filter(Boolean)
+            .join("; ");
         }
       }
     } catch {
