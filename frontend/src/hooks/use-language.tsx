@@ -954,7 +954,7 @@ const translations: Record<string, Record<Language, string>> = {
   "login.statStudents": { en: "Learners", ru: "Учеников", uz: "O'quvchilar" },
   "login.statTeachers": { en: "Teachers", ru: "Преподавателей", uz: "O'qituvchilar" },
   "login.statSatisfaction": { en: "Satisfaction", ru: "Довольны", uz: "Qoniqish" },
-  "login.welcomeBack": { en: "Welcome back", ru: "С возвращением", uz: "Xush kelibsiz" },
+  "login.welcomeBack": { en: "Welcome", ru: "Добро пожаловать", uz: "Xush kelibsiz" },
   "login.subtitle": { en: "Sign in to your account to continue", ru: "Войдите в аккаунт чтобы продолжить", uz: "Davom etish uchun hisobingizga kiring" },
   "login.phone": { en: "Login", ru: "Логин", uz: "Login" },
   "login.password": { en: "Password", ru: "Пароль", uz: "Parol" },
