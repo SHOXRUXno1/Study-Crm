@@ -149,8 +149,6 @@ export default function GroupProfile() {
 
   const [activeStudent, setActiveStudent] = useState<GroupProfileStudent | null>(null);
   const [removeReason, setRemoveReason] = useState("");
-  const [transferTargetGroupId, setTransferTargetGroupId] = useState("");
-  const [transferDate, setTransferDate] = useState(new Date().toISOString().slice(0, 10));
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
   const [enrollDate, setEnrollDate] = useState(new Date().toISOString().slice(0, 10));
   const [vacationDate, setVacationDate] = useState(new Date().toISOString().slice(0, 10));
@@ -435,13 +433,7 @@ export default function GroupProfile() {
   const handleOpenTransfer = (student: GroupProfileStudent) => {
     if (!policy.canTransferStudent) return;
     setActiveStudent(student);
-    setTransferTargetGroupId("");
-    setTransferDate(new Date().toISOString().slice(0, 10));
     setTransferOpen(true);
-  };
-
-  const handleConfirmTransfer = async () => {
-    // Transfer is now handled internally by GroupProfileDialogs via useTransferStudent.
   };
 
   const handleCreateVacation = async () => {
@@ -588,11 +580,6 @@ export default function GroupProfile() {
         setRemoveReason={setRemoveReason}
         onSubmitRemove={handleConfirmRemove}
         activeStudentId={activeStudent ? Number(activeStudent.id) : null}
-        transferTargetGroupId={transferTargetGroupId}
-        setTransferTargetGroupId={setTransferTargetGroupId}
-        transferDate={transferDate}
-        setTransferDate={setTransferDate}
-        onSubmitTransfer={handleConfirmTransfer}
         vacationDate={vacationDate}
         setVacationDate={setVacationDate}
         vacationNote={vacationNote}

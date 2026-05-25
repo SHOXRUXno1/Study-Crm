@@ -7,7 +7,7 @@ import {
   Search, Plus, MoreHorizontal, Phone,
   ChevronLeft, ChevronRight, Eye, Pencil, Trash2,
   Users, AlertTriangle, CheckCircle2, UserX,
-  X, Loader2,
+  X, Loader2, Lock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
@@ -771,7 +771,10 @@ function StudentDialog({
       phone:        phone.trim() || null,
       parent_phone: parentPhone.trim() || null,
       source:       source,
-      group_id:     groupId,
+      // ``group_id`` is intentionally excluded from edit payloads: changing
+      // a student's group goes through the dedicated Transfer dialog so debt,
+      // capacity and audit invariants stay consistent.
+      ...(isEdit ? {} : { group_id: groupId }),
       ...(trimmedPassword ? { password: trimmedPassword } : {}),
     };
     try {
@@ -880,7 +883,26 @@ function StudentDialog({
             {/* Группа — триггер */}
             <div className="space-y-1.5">
               <Label>{t("students.group")}</Label>
-              {selectedGroup ? (
+              {isEdit && editTarget?.group_id ? (
+                // Read-only in edit mode: changing groups must go through the
+                // Transfer dialog so debt/capacity/audit are handled atomically.
+                <div className="space-y-1">
+                  <div
+                    className="w-full rounded-md border border-input bg-muted/40 px-3 h-10 flex items-center justify-between gap-2 text-sm"
+                    title={t("transfer.useTransferDialog")}
+                  >
+                    <span className="font-medium text-foreground truncate">
+                      {selectedGroup
+                        ? `${selectedGroup.code} · ${selectedGroup.time_slot}`
+                        : `#${editTarget.group_id}`}
+                    </span>
+                    <Lock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    {t("transfer.useTransferDialog")}
+                  </p>
+                </div>
+              ) : selectedGroup ? (
                 <button
                   type="button"
                   onClick={() => setGroupOpen((p) => !p)}
@@ -914,7 +936,7 @@ function StudentDialog({
           </div>
 
           {/* Группа — выпадающий список (на всю ширину) */}
-          {groupOpen && (
+          {!(isEdit && editTarget?.group_id) && groupOpen && (
             <div className="rounded-lg border border-border/60 bg-card shadow-sm overflow-hidden -mt-1">
               <div className="p-2 border-b border-border/40">
                 <div className="relative">

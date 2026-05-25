@@ -44,8 +44,10 @@ import {
 import {
   useStudent, useUpdateStudent, useDeleteStudent,
   useStudentNotes, useCreateStudentNote, useDeleteStudentNote,
-  useTransferStudent, useStudentTransfers,
+  useStudentTransfers,
 } from "@/hooks/use-students";
+import { TransferStudentDialog } from "@/components/transfer/TransferStudentDialog";
+import { useAuth } from "@/hooks/use-auth";
 import { useGroup, useGroups, expandDays, type DaysType } from "@/hooks/use-groups";
 import { useStudentLedger } from "@/hooks/use-finance";
 import {
@@ -103,6 +105,8 @@ export default function StudentProfile() {
   const dfLocale: Locale = LOCALES[language] ?? enUS;
 
   const studentId = Number(id);
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
 
   // ── Queries ────────────────────────────────────────────────────────
   const { data: apiStudent, isLoading: apiLoading, isError: apiError } = useStudent(id ?? "");
@@ -123,9 +127,12 @@ export default function StudentProfile() {
   const deleteNoteM = useDeleteStudentNote();
 
   // Transfer
-  const transferM = useTransferStudent(studentId);
-  const transfersQ = useStudentTransfers(studentId);
+  // ``useStudentTransfers`` is admin-only on the backend; the query stays
+  // disabled for non-admins so we don't surface 403s in the console.
+  const transfersQ = useStudentTransfers(isAdmin ? studentId : 0);
   const [noteText, setNoteText] = useState("");
+  // Shared transfer dialog (replaces the inline move form).
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
 
   // Attendance range (30 / 90 / all days back)
   const [attRange, setAttRange] = useState<"30" | "90" | "all">("90");
@@ -199,12 +206,6 @@ export default function StudentProfile() {
   const [enrollDay, setEnrollDay] = useState<string>("all");
   const [enrollAvailability, setEnrollAvailability] = useState<string>("all");
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-
-  // Transfer (move) — extra state for the move dialog
-  const [moveDebtPolicy, setMoveDebtPolicy] = useState<"writeoff" | "snapshot">("writeoff");
-  const [moveReason, setMoveReason] = useState("");
-  const [moveForce, setMoveForce] = useState(false);
-  const [moveTransferDate, setMoveTransferDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   useEffect(() => {
     if (student) {
@@ -414,43 +415,23 @@ export default function StudentProfile() {
   const handleEnroll = async () => {
     if (!selectedGroup || !student || !apiStudent) return;
     const isMove = !!apiStudent.group_id && String(apiStudent.group_id) !== selectedGroup.id;
+    // Moves (group change) route through the dedicated TransferStudentDialog
+    // so they get the debt preview, policies, audit and capacity handling.
+    if (isMove) {
+      setEnrollOpen(false);
+      setTransferDialogOpen(true);
+      return;
+    }
     try {
-      if (isMove) {
-        // Use the dedicated transfer endpoint
-        const result = await transferM.mutateAsync({
-          to_group_id: Number(selectedGroup.id),
-          transfer_date: moveTransferDate,
-          debt_policy: moveDebtPolicy,
-          reason: moveReason.trim() || null,
-          force: moveForce,
-        });
-        if (result.debt_action === "writeoff" && result.prev_debt > 0) {
-          toast.success(
-            t("transfer.successWithWriteoff")
-              .replace("{{group}}", selectedGroup.code)
-              .replace("{{amount}}", formatCurrencyUZS(result.prev_debt)),
-          );
-        } else {
-          toast.success(t("transfer.success").replace("{{group}}", selectedGroup.code));
-        }
-      } else {
-        await updateM.mutateAsync({
-          id: apiStudent.id,
-          data: { group_id: Number(selectedGroup.id) },
-        });
-        toast.success(t("profile.enrollSuccess").replace("{{group}}", selectedGroup.code));
-      }
+      await updateM.mutateAsync({
+        id: apiStudent.id,
+        data: { group_id: Number(selectedGroup.id) },
+      });
+      toast.success(t("profile.enrollSuccess").replace("{{group}}", selectedGroup.code));
       setEnrollOpen(false);
       resetEnrollForm();
-      setMoveDebtPolicy("writeoff");
-      setMoveReason("");
-      setMoveForce(false);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (msg.includes("same_group")) toast.error(t("transfer.errorSameGroup"));
-      else if (msg.includes("group_completed")) toast.error(t("transfer.errorCompleted"));
-      else if (msg.includes("capacity_exceeded")) toast.error(t("transfer.errorCapacity"));
-      else toast.error(msg || t("common.error"));
+      toast.error(e instanceof Error ? e.message : t("common.unknownError"));
     }
   };
 
@@ -846,9 +827,11 @@ export default function StudentProfile() {
               <TabsTrigger value="notes" className="text-sm gap-2 px-4 py-2 data-[state=active]:bg-card data-[state=active]:shadow-sm">
                 <MessageSquare className="h-4 w-4" /> {t("profile.notes")}
             </TabsTrigger>
-              <TabsTrigger value="transfers" className="text-sm gap-2 px-4 py-2 data-[state=active]:bg-card data-[state=active]:shadow-sm">
-                <GraduationCap className="h-4 w-4" /> {t("transfer.history")}
-            </TabsTrigger>
+              {isAdmin && (
+                <TabsTrigger value="transfers" className="text-sm gap-2 px-4 py-2 data-[state=active]:bg-card data-[state=active]:shadow-sm">
+                  <GraduationCap className="h-4 w-4" /> {t("transfer.history")}
+                </TabsTrigger>
+              )}
           </TabsList>
           </div>
 
@@ -1134,6 +1117,7 @@ export default function StudentProfile() {
           </TabsContent>
 
           {/* Transfers tab */}
+          {isAdmin && (
           <TabsContent value="transfers">
             <div className="space-y-3">
               {transfersQ.isLoading ? (
@@ -1181,6 +1165,10 @@ export default function StudentProfile() {
                               <span className="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 text-[11px] font-medium">
                                 {t("transfer.debtKept")}
                               </span>
+                            ) : tr.debt_action === "reset" ? (
+                              <span className="inline-flex items-center rounded-full bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 px-2 py-0.5 text-[11px] font-medium">
+                                {t("transfer.debtReset")}
+                              </span>
                             ) : (
                               <span className="text-muted-foreground">—</span>
                             )}
@@ -1196,6 +1184,7 @@ export default function StudentProfile() {
               )}
             </div>
           </TabsContent>
+          )}
         </Tabs>
 
         {/* Edit Dialog */}
@@ -1395,46 +1384,12 @@ export default function StudentProfile() {
                     <Input value={`${formatNumber(selectedPrice)} UZS`} readOnly className="h-8 text-xs bg-muted/50" />
                   </div>
 
-                  {/* Move-specific fields */}
+                  {/* For moves (already enrolled elsewhere), all the
+                     debt/date/policy/reason controls now live in the shared
+                     TransferStudentDialog so the rules stay consistent. */}
                   {isMove && (
-                    <div className="space-y-3 border-t border-primary/20 pt-3">
-                      <div className="grid gap-1">
-                        <Label className="text-[11px] text-muted-foreground">{t("transfer.date")}</Label>
-                        <Input
-                          type="date"
-                          value={moveTransferDate}
-                          onChange={(e) => setMoveTransferDate(e.target.value)}
-                          className="h-8 text-xs"
-                        />
-                      </div>
-
-                      {billing && (billing.debt_amount ?? 0) > 0 && (
-                        <div className="space-y-1.5">
-                          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-                            {t("transfer.debtPolicy")}
-                            {" · "}
-                            <span className="text-destructive">{formatCurrencyUZS(billing.debt_amount ?? 0)}</span>
-                          </p>
-                          <label className="flex items-start gap-2 cursor-pointer text-xs">
-                            <input type="radio" name="move_debt" value="writeoff" checked={moveDebtPolicy === "writeoff"} onChange={() => setMoveDebtPolicy("writeoff")} className="mt-0.5" />
-                            {t("transfer.debtPolicy.writeoff")}
-                          </label>
-                          <label className="flex items-start gap-2 cursor-pointer text-xs">
-                            <input type="radio" name="move_debt" value="snapshot" checked={moveDebtPolicy === "snapshot"} onChange={() => setMoveDebtPolicy("snapshot")} className="mt-0.5" />
-                            {t("transfer.debtPolicy.snapshot")}
-                          </label>
-                        </div>
-                      )}
-
-                      <label className="flex items-center gap-2 cursor-pointer text-xs text-muted-foreground">
-                        <input type="checkbox" checked={moveForce} onChange={(e) => setMoveForce(e.target.checked)} className="rounded" />
-                        {t("transfer.forceOverflow")}
-                      </label>
-
-                      <div className="grid gap-1">
-                        <Label className="text-[11px] text-muted-foreground">{t("transfer.reason")}</Label>
-                        <Textarea value={moveReason} onChange={(e) => setMoveReason(e.target.value)} rows={2} maxLength={500} className="text-xs resize-none" placeholder="—" />
-                      </div>
+                    <div className="border-t border-primary/20 pt-3 text-[11px] text-muted-foreground">
+                      {t("transfer.useTransferDialog")}
                     </div>
                   )}
                 </div>
@@ -1442,16 +1397,31 @@ export default function StudentProfile() {
             })()}
 
             <DialogFooter className="pt-2 gap-2">
-              <Button variant="outline" onClick={() => setEnrollOpen(false)} disabled={updateM.isPending || transferM.isPending}>
+              <Button variant="outline" onClick={() => setEnrollOpen(false)} disabled={updateM.isPending}>
                 {t("common.cancel")}
               </Button>
-              <Button onClick={handleEnroll} disabled={!selectedGroup || updateM.isPending || transferM.isPending}>
-                {(updateM.isPending || transferM.isPending) ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />}
-                {t("profile.enrollAction")}
+              <Button onClick={handleEnroll} disabled={!selectedGroup || updateM.isPending}>
+                {updateM.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />}
+                {selectedGroup && apiStudent?.group_id && String(apiStudent.group_id) !== selectedGroup.id
+                  ? t("transfer.confirm")
+                  : t("profile.enrollAction")}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Shared Transfer dialog (handles preview, 3 policies, structured errors). */}
+        <TransferStudentDialog
+          open={transferDialogOpen}
+          onOpenChange={setTransferDialogOpen}
+          studentId={apiStudent?.id ?? null}
+          studentLabel={apiStudent?.full_name ?? null}
+          candidateGroups={allGroups}
+          currentGroupId={apiStudent?.group_id ?? null}
+          onTransferred={() => {
+            resetEnrollForm();
+          }}
+        />
 
         {/* Reason-edit Dialog */}
         <Dialog open={reasonRow !== null} onOpenChange={(o) => !o && closeReasonDialog()}>

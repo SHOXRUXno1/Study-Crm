@@ -240,7 +240,10 @@ async def update_student(
     ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Use POST /students/{id}/transfer to change a student's group",
+            detail={
+                "code": "use_transfer_endpoint",
+                "message": "Use POST /students/{id}/transfer to change a student's group",
+            },
         )
 
     # Pre-check phone uniqueness (faster, friendlier than catching DB error).

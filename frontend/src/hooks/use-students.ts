@@ -245,17 +245,26 @@ export function useDeleteStudentNote() {
 
 // ── Transfer types ───────────────────────────────────────────────────────────
 
-export type DebtPolicy = "writeoff" | "snapshot";
+export type DebtPolicy = "writeoff" | "snapshot" | "reset";
 
 export interface TransferPreview {
   from_group_id: number | null;
   from_group_name: string | null;
+  from_monthly_price: number | null;
   to_group_id: number;
   to_group_name: string;
+  to_monthly_price: number;
   prev_debt: number;
+  projected_debt_after_writeoff: number;
+  projected_debt_after_snapshot: number;
+  projected_debt_after_reset: number;
   capacity_current: number;
   capacity_max: number;
   capacity_exceeded: boolean;
+  transfer_date_min: string;
+  transfer_date_max: string;
+  target_completed: boolean;
+  same_group: boolean;
 }
 
 export interface TransferRequest {
@@ -300,8 +309,10 @@ export interface StudentTransferRead {
 // ── Transfer query keys ──────────────────────────────────────────────────────
 
 export const transferKeys = {
-  preview: (studentId: number, toGroupId: number) =>
-    ["students", studentId, "transfer-preview", toGroupId] as const,
+  // transfer_date is part of the key so changing it refetches a fresh preview
+  // (previously omitted → stale debt projection for up to ``staleTime``).
+  preview: (studentId: number, toGroupId: number, transferDate: string) =>
+    ["students", studentId, "transfer-preview", toGroupId, transferDate] as const,
   history: (studentId: number) =>
     ["students", studentId, "transfers"] as const,
 };
@@ -314,7 +325,7 @@ export function useTransferPreview(
 ) {
   return useQuery<TransferPreview>({
     queryKey: params
-      ? transferKeys.preview(studentId, params.to_group_id)
+      ? transferKeys.preview(studentId, params.to_group_id, params.transfer_date ?? "")
       : (["transfer-preview-disabled"] as const),
     queryFn: () => {
       const qs = new URLSearchParams({ to_group_id: String(params!.to_group_id) });
@@ -335,6 +346,9 @@ export function useTransferStudent(studentId: number) {
       apiClient.post<TransferResult>(`/students/${studentId}/transfer`, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: studentKeys.all });
+      // Force-fresh the single-student detail too: backend now syncs
+      // ``payment_status`` post-transfer, and the badge in the UI must reflect it.
+      qc.invalidateQueries({ queryKey: studentKeys.detail(studentId) });
       qc.invalidateQueries({ queryKey: ["groups"] });
       qc.invalidateQueries({ queryKey: ["finance"] });
       qc.invalidateQueries({ queryKey: ["notifications"] });

@@ -1,9 +1,10 @@
 """Student transfer service.
 
 Single entry point for moving a student from one group to another. The entire
-operation is atomic: billing snapshot, optional debt write-off, group assignment
-and audit record all commit together. Notification emission happens *after* the
-commit so a DB failure cannot leave a stale notification.
+operation is atomic: billing snapshot, optional debt adjustment, group
+assignment and audit record all commit together. Notification emission and
+denormalised ``payment_status`` recomputation happen *after* the commit so a
+DB failure cannot leave a stale notification or wrong status.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ import logging
 from datetime import date, timedelta
 from typing import Optional
 
+from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,12 +27,24 @@ from app.schemas.student_transfer import (
     StudentTransferPreview,
     StudentTransferResult,
 )
-from app.services.finance_service import compute_billing
+from app.services.finance_service import compute_billing, sync_payment_status
 
 logger = logging.getLogger(__name__)
 
 _MAX_DAYS_PAST = 30
 _MAX_DAYS_FUTURE = 30
+
+
+def _err(status_code: int, code: str, message: str, **extra) -> HTTPException:
+    """Build an HTTPException with a structured ``{ code, message, ... }`` body.
+
+    The frontend matches on ``code`` and shows ``message`` only as a fallback,
+    so the codes are stable contract; messages can be reworded freely.
+    """
+    detail: dict = {"code": code, "message": message}
+    if extra:
+        detail.update(extra)
+    return HTTPException(status_code=status_code, detail=detail)
 
 
 async def preview_transfer(
@@ -40,30 +54,51 @@ async def preview_transfer(
     to_group_id: int,
     transfer_date: Optional[date] = None,
 ) -> StudentTransferPreview:
-    """Compute a read-only preview: debt snapshot + capacity info."""
-    transfer_date = transfer_date or date.today()
+    """Compute a read-only preview with full before/after projections."""
+    today = date.today()
+    effective_date = transfer_date or today
 
     new_group = await db.get(Group, to_group_id)
     if new_group is None:
-        from fastapi import HTTPException  # local import to avoid circular
-        raise HTTPException(status_code=404, detail="Target group not found")
+        raise _err(404, "target_not_found", "Target group not found")
 
     old_group: Optional[Group] = (
         await db.get(Group, student.group_id) if student.group_id else None
     )
 
-    snap = await compute_billing(db, student=student, group=old_group, today=transfer_date)
-    prev_debt = max(0, snap.debt_amount) if snap.debt_amount else 0
+    # Pre-transfer debt: compute against current (old) group at the proposed date.
+    snap_old = await compute_billing(
+        db, student=student, group=old_group, today=effective_date
+    )
+    prev_debt = max(0, snap_old.debt_amount) if snap_old.debt_amount else 0
+
+    # Post-transfer debt under SNAPSHOT policy: recompute against the new
+    # group at the same date, with all existing payments still credited.
+    snap_new = await compute_billing(
+        db, student=student, group=new_group, today=effective_date
+    )
+    projected_snapshot = (
+        max(0, snap_new.debt_amount) if snap_new.debt_amount else 0
+    )
 
     return StudentTransferPreview(
         from_group_id=old_group.id if old_group else None,
         from_group_name=old_group.name if old_group else None,
+        from_monthly_price=old_group.price if old_group else None,
         to_group_id=new_group.id,
         to_group_name=new_group.name,
+        to_monthly_price=new_group.price,
         prev_debt=prev_debt,
+        projected_debt_after_writeoff=0,
+        projected_debt_after_snapshot=projected_snapshot,
+        projected_debt_after_reset=0,
         capacity_current=new_group.student_count,
         capacity_max=new_group.max_students,
         capacity_exceeded=new_group.student_count >= new_group.max_students,
+        transfer_date_min=today - timedelta(days=_MAX_DAYS_PAST),
+        transfer_date_max=today + timedelta(days=_MAX_DAYS_FUTURE),
+        target_completed=(new_group.status == "completed"),
+        same_group=(student.group_id == to_group_id),
     )
 
 
@@ -80,58 +115,61 @@ async def transfer_student(
 ) -> StudentTransferResult:
     """Execute the transfer atomically."""
     today = date.today()
+    date_min = today - timedelta(days=_MAX_DAYS_PAST)
+    date_max = today + timedelta(days=_MAX_DAYS_FUTURE)
 
     # ── Validate transfer_date window ────────────────────────────────────────
-    if transfer_date < today - timedelta(days=_MAX_DAYS_PAST):
-        from fastapi import HTTPException
-        raise HTTPException(
-            status_code=422,
-            detail=f"transfer_date cannot be more than {_MAX_DAYS_PAST} days in the past",
-        )
-    if transfer_date > today + timedelta(days=_MAX_DAYS_FUTURE):
-        from fastapi import HTTPException
-        raise HTTPException(
-            status_code=422,
-            detail=f"transfer_date cannot be more than {_MAX_DAYS_FUTURE} days in the future",
+    if transfer_date < date_min or transfer_date > date_max:
+        raise _err(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "transfer_date_out_of_range",
+            f"transfer_date must be within ±{_MAX_DAYS_PAST} days of today",
+            min=date_min.isoformat(),
+            max=date_max.isoformat(),
         )
 
     # ── Load new group ───────────────────────────────────────────────────────
     new_group = await db.get(Group, to_group_id)
     if new_group is None:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="Target group not found")
+        raise _err(404, "target_not_found", "Target group not found")
 
     # ── Business rule checks ─────────────────────────────────────────────────
     if student.group_id is None:
-        from fastapi import HTTPException
-        raise HTTPException(
-            status_code=409,
-            detail="Student is not enrolled in any group. Use enroll instead of transfer.",
+        raise _err(
+            status.HTTP_409_CONFLICT,
+            "not_enrolled",
+            "Student is not enrolled in any group. Use enroll instead of transfer.",
         )
 
     if student.group_id == to_group_id:
-        from fastapi import HTTPException
-        raise HTTPException(
-            status_code=409,
-            detail="same_group: student is already in the target group",
+        raise _err(
+            status.HTTP_409_CONFLICT,
+            "same_group",
+            "Student is already in the target group",
         )
 
     if new_group.status == "completed":
-        from fastapi import HTTPException
-        raise HTTPException(
-            status_code=409,
-            detail="group_completed: cannot transfer into a completed group",
+        raise _err(
+            status.HTTP_409_CONFLICT,
+            "group_completed",
+            "Cannot transfer into a completed group",
         )
 
     if new_group.student_count >= new_group.max_students and not force:
-        from fastapi import HTTPException
-        raise HTTPException(
-            status_code=409,
-            detail="capacity_exceeded",
-            headers={
-                "X-Capacity-Current": str(new_group.student_count),
-                "X-Capacity-Max": str(new_group.max_students),
-            },
+        raise _err(
+            status.HTTP_409_CONFLICT,
+            "capacity_exceeded",
+            "Target group is full",
+            current=new_group.student_count,
+            max=new_group.max_students,
+        )
+
+    # Admin override (reset) requires an explicit reason for the audit trail.
+    if debt_policy == "reset" and not (reason and reason.strip()):
+        raise _err(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "reset_requires_reason",
+            "Reset policy requires a non-empty reason",
         )
 
     # ── Debt snapshot ────────────────────────────────────────────────────────
@@ -141,11 +179,13 @@ async def transfer_student(
     snap = await compute_billing(db, student=student, group=old_group, today=transfer_date)
     prev_debt = max(0, snap.debt_amount) if snap.debt_amount else 0
 
-    # ── Optional debt write-off via adjustment Payment ───────────────────────
+    # ── Debt action: writeoff / snapshot / reset / none ──────────────────────
     adjustment_payment: Optional[Payment] = None
     debt_action: str
 
-    if prev_debt > 0 and debt_policy == "writeoff":
+    if prev_debt == 0:
+        debt_action = "none"
+    elif debt_policy == "writeoff":
         adjustment_payment = Payment(
             student_id=student.id,
             amount=prev_debt,
@@ -157,18 +197,32 @@ async def transfer_student(
             ),
         )
         db.add(adjustment_payment)
-        await db.flush()  # get the id before commit
+        await db.flush()
         debt_action = "writeoff"
-    elif prev_debt == 0:
-        debt_action = "none"
-    else:
+    elif debt_policy == "reset":
+        # Admin override: clear debt and document intent in the note + audit.
+        adjustment_payment = Payment(
+            student_id=student.id,
+            amount=prev_debt,
+            method="adjustment",
+            paid_at=transfer_date,
+            note=(
+                f"[transfer:reset] admin override "
+                f"from group {old_group.id if old_group else '?'} "
+                f"({old_group.name if old_group else '?'}): "
+                f"{reason.strip() if reason else ''}"
+            ),
+        )
+        db.add(adjustment_payment)
+        await db.flush()
+        debt_action = "reset"
+    else:  # snapshot
         debt_action = "snapshot"
 
     # ── Update student ───────────────────────────────────────────────────────
     from_group_id = student.group_id
     student.group_id = to_group_id
 
-    # Update denormalised counters on the groups
     if old_group is not None:
         old_group.student_count = max(0, old_group.student_count - 1)
     new_group.student_count = new_group.student_count + 1
@@ -194,6 +248,19 @@ async def transfer_student(
     await db.commit()
     await db.refresh(student)
 
+    # ── Post-commit side effects ─────────────────────────────────────────────
+    # Recompute denormalised payment_status against the new group so the UI
+    # badge does not lag behind reality (was a stale-status bug).
+    try:
+        await sync_payment_status(db, student=student)
+        await db.commit()
+    except Exception:  # noqa: BLE001
+        logger.warning(
+            "sync_payment_status after transfer failed for student=%s",
+            student.id,
+            exc_info=True,
+        )
+
     # ── Emit notification (best-effort, after commit) ────────────────────────
     try:
         from app.services import notifications_service as ns
@@ -209,9 +276,13 @@ async def transfer_student(
                 seen.add((uname, "teacher"))
 
         title = f"{student.full_name}: переведён"
+        debt_suffix = ""
+        if debt_action == "writeoff":
+            debt_suffix = f" · списано {prev_debt:,} UZS"
+        elif debt_action == "reset":
+            debt_suffix = f" · обнулено {prev_debt:,} UZS (admin)"
         body = (
-            f"{old_group.name if old_group else '—'} → {new_group.name}"
-            + (f" · списано {prev_debt:,} UZS" if debt_action == "writeoff" else "")
+            f"{old_group.name if old_group else '—'} → {new_group.name}{debt_suffix}"
         )
 
         await ns.emit(
