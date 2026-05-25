@@ -2132,6 +2132,7 @@ const translations: Record<string, Record<Language, string>> = {
   "transfer.errorUseTransfer":     { en: "Use the Transfer dialog to change a student's group", ru: "Для смены группы используйте диалог «Перевести»", uz: "Guruhni o'zgartirish uchun «Ko'chirish» oynasidan foydalaning" },
   "transfer.errorNotEnrolled":     { en: "Student is not enrolled in any group", ru: "Ученик не состоит ни в одной группе", uz: "O'quvchi hech qaysi guruhda emas" },
   "transfer.errorTargetNotFound":  { en: "Target group not found",      ru: "Целевая группа не найдена",            uz: "Maqsadli guruh topilmadi" },
+  "transfer.errorServer":          { en: "Server error. Please try again or contact your administrator.", ru: "Ошибка сервера. Попробуйте ещё раз или сообщите администратору.", uz: "Server xatosi. Yana urinib ko'ring yoki administratorga murojaat qiling." },
   "transfer.debt":                 { en: "Debt",                        ru: "Долг",                                 uz: "Qarzdorlik" },
   "transfer.debtWrittenOff":       { en: "Written off",                 ru: "Списано",                              uz: "Hisobdan chiqarildi" },
   "transfer.debtKept":             { en: "Kept",                        ru: "Сохранён",                             uz: "Saqlangan" },

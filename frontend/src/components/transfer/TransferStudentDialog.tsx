@@ -86,34 +86,44 @@ function buildOptions(
   });
 }
 
-/** Map a structured backend error code to a human i18n string. */
-function mapErrorCode(
-  code: string,
-  t: (key: string) => string,
-  detail?: Record<string, unknown>,
-): string {
-  switch (code) {
-    case "same_group":
-      return t("transfer.errorSameGroup");
-    case "group_completed":
-      return t("transfer.errorCompleted");
-    case "capacity_exceeded":
-      return t("transfer.errorCapacity");
-    case "transfer_date_out_of_range":
-      return t("transfer.errorDateRange");
-    case "reset_requires_reason":
-      return t("transfer.errorResetReason");
-    case "use_transfer_endpoint":
-      return t("transfer.errorUseTransfer");
-    case "not_enrolled":
-      return t("transfer.errorNotEnrolled");
-    case "target_not_found":
-      return t("transfer.errorTargetNotFound");
-    default:
-      // Fallback to the server-provided message if present.
-      if (detail && typeof detail.message === "string") return detail.message;
-      return t("common.unknownError");
+/** Resolve an error from the transfer endpoint to a user-visible string.
+ *
+ * Priority:
+ * 1. Structured `{ code }` from backend → i18n by code.
+ * 2. HTTP 5xx (or any error without a parseable detail) → generic server-error key.
+ * 3. Backend-provided `detail.message` string.
+ * 4. `e.message` (last resort).
+ */
+function mapApiError(e: unknown, t: (key: string) => string): string {
+  if (e instanceof ApiError) {
+    const detail =
+      e.detail && typeof e.detail === "object" && !Array.isArray(e.detail)
+        ? (e.detail as Record<string, unknown>)
+        : null;
+
+    if (detail && typeof detail.code === "string") {
+      const codeMap: Record<string, string> = {
+        same_group:                t("transfer.errorSameGroup"),
+        group_completed:           t("transfer.errorCompleted"),
+        capacity_exceeded:         t("transfer.errorCapacity"),
+        transfer_date_out_of_range: t("transfer.errorDateRange"),
+        reset_requires_reason:     t("transfer.errorResetReason"),
+        use_transfer_endpoint:     t("transfer.errorUseTransfer"),
+        not_enrolled:              t("transfer.errorNotEnrolled"),
+        target_not_found:          t("transfer.errorTargetNotFound"),
+      };
+      return codeMap[detail.code] ?? (typeof detail.message === "string" ? detail.message : t("common.unknownError"));
+    }
+
+    // 5xx or no structured detail — don't show raw HTTP text to the user.
+    if (e.status >= 500 || !detail) return t("transfer.errorServer");
+
+    // 4xx with a plain string detail.
+    if (typeof e.detail === "string") return e.detail;
   }
+
+  if (e instanceof Error) return e.message;
+  return t("common.unknownError");
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -212,20 +222,7 @@ export function TransferStudentDialog({
       onOpenChange(false);
       onTransferred?.();
     } catch (e: unknown) {
-      if (
-        e instanceof ApiError &&
-        e.detail &&
-        typeof e.detail === "object" &&
-        !Array.isArray(e.detail) &&
-        "code" in (e.detail as Record<string, unknown>)
-      ) {
-        const d = e.detail as Record<string, unknown>;
-        toast.error(mapErrorCode(String(d.code), t, d));
-      } else if (e instanceof Error) {
-        toast.error(e.message);
-      } else {
-        toast.error(t("common.unknownError"));
-      }
+      toast.error(mapApiError(e, t));
     }
   };
 
@@ -458,8 +455,7 @@ export function TransferStudentDialog({
             </div>
           ) : previewQ.isError ? (
             <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
-              {(previewQ.error as Error | undefined)?.message ??
-                t("common.unknownError")}
+              {mapApiError(previewQ.error, t)}
             </div>
           ) : null}
 

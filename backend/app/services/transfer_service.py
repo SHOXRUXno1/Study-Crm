@@ -83,10 +83,10 @@ async def preview_transfer(
 
     return StudentTransferPreview(
         from_group_id=old_group.id if old_group else None,
-        from_group_name=old_group.name if old_group else None,
+        from_group_name=old_group.code if old_group else None,
         from_monthly_price=old_group.price if old_group else None,
         to_group_id=new_group.id,
-        to_group_name=new_group.name,
+        to_group_name=new_group.code,
         to_monthly_price=new_group.price,
         prev_debt=prev_debt,
         projected_debt_after_writeoff=0,
@@ -193,7 +193,7 @@ async def transfer_student(
             paid_at=transfer_date,
             note=(
                 f"[transfer] write-off from group {old_group.id} "
-                f"({old_group.name if old_group else '?'})"
+                f"({old_group.code if old_group else '?'})"
             ),
         )
         db.add(adjustment_payment)
@@ -209,7 +209,7 @@ async def transfer_student(
             note=(
                 f"[transfer:reset] admin override "
                 f"from group {old_group.id if old_group else '?'} "
-                f"({old_group.name if old_group else '?'}): "
+                f"({old_group.code if old_group else '?'}): "
                 f"{reason.strip() if reason else ''}"
             ),
         )
@@ -282,7 +282,7 @@ async def transfer_student(
         elif debt_action == "reset":
             debt_suffix = f" · обнулено {prev_debt:,} UZS (admin)"
         body = (
-            f"{old_group.name if old_group else '—'} → {new_group.name}{debt_suffix}"
+            f"{old_group.code if old_group else '—'} → {new_group.code}{debt_suffix}"
         )
 
         await ns.emit(
@@ -296,9 +296,9 @@ async def transfer_student(
                 "student_id": student.id,
                 "student_name": student.full_name,
                 "from_group_id": from_group_id,
-                "from_group_name": old_group.name if old_group else None,
+                "from_group_name": old_group.code if old_group else None,
                 "to_group_id": to_group_id,
-                "to_group_name": new_group.name,
+                "to_group_name": new_group.code,
                 "transfer_date": transfer_date.isoformat(),
                 "prev_debt": prev_debt,
                 "debt_action": debt_action,

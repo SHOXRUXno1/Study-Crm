@@ -442,7 +442,7 @@ async def list_student_transfers(
     def _make_group_snap(group) -> GroupSnapshot | None:
         if group is None:
             return None
-        return GroupSnapshot(id=group.id, name=group.name)
+        return GroupSnapshot(id=group.id, name=group.code)
 
     result = []
     for r in rows:
