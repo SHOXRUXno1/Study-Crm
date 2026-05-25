@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { MoreHorizontal, Phone, PhoneCall, Plus, X } from "lucide-react";
+import { ArrowRightLeft, MoreHorizontal, Phone, PhoneCall, Plus, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -156,6 +156,7 @@ export function GroupStudentsSection({
                         {isAdmin && (
                           <>
                             <DropdownMenuItem onClick={() => onTransferStudent(s)}>
+                              <ArrowRightLeft className="h-3.5 w-3.5 mr-2" />
                               {t("groups.actionTransfer")}
                             </DropdownMenuItem>
                             <DropdownMenuItem
