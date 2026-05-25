@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/hooks/use-language";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, Calendar, CreditCard,
+  ArrowLeft, ArrowRightLeft, Calendar, CreditCard,
   BookOpen, Clock, CheckCircle2, XCircle, TrendingUp, TrendingDown, AlertCircle,
   Pencil, Check, X, Save, Trash2, ChevronLeft, ChevronRight,
   User, GraduationCap, Plus, Wallet, Lock, Loader2,
@@ -597,6 +597,20 @@ export default function StudentProfile() {
                       >
                         <Pencil className="h-3 w-3" /> {t("common.edit")}
                       </Button>
+
+                      {/* Transfer button — admin-only, prominent shortcut */}
+                      {isAdmin && apiStudent.group_id && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 text-xs bg-card border-border text-foreground hover:bg-primary/10 hover:border-primary/40 hover:text-primary transition-colors"
+                          onClick={() => setTransferDialogOpen(true)}
+                        >
+                          <ArrowRightLeft className="h-3 w-3" />
+                          {t("groups.actionTransfer")}
+                        </Button>
+                      )}
+
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                       <Button
@@ -617,6 +631,13 @@ export default function StudentProfile() {
                             <DropdownMenuItem onClick={() => setActiveToggleOpen(true)}>
                               <UserCheck className="h-3.5 w-3.5 mr-2" />
                               {t("profile.activate")}
+                            </DropdownMenuItem>
+                          )}
+                          {/* Transfer in dropdown for admin when no group (enroll path) */}
+                          {isAdmin && !apiStudent.group_id && (
+                            <DropdownMenuItem onClick={() => setTransferDialogOpen(true)}>
+                              <ArrowRightLeft className="h-3.5 w-3.5 mr-2" />
+                              {t("groups.actionTransfer")}
                             </DropdownMenuItem>
                           )}
                           {apiStudent.group_id && (
