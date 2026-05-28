@@ -1,4 +1,4 @@
-import { Component, type ReactNode, type ErrorInfo } from "react";
+import { Component, useEffect, type ReactNode, type ErrorInfo } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 
@@ -69,6 +69,20 @@ import ManagerDashboard from "./pages/ManagerDashboard.tsx";
 import ManagerAnalytics from "./pages/ManagerAnalytics.tsx";
 import ManagersPage from "./pages/ManagersPage.tsx";
 import ManagerSettingsPage from "./pages/ManagerSettingsPage.tsx";
+import { useBranding } from "@/hooks/use-branding";
+import defaultFavicon from "@/assets/logo.png";
+
+function BrandingEffects() {
+  const { brandName, brandLogo } = useBranding();
+  useEffect(() => {
+    document.title = brandName;
+    const link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+    if (link) {
+      link.href = brandLogo ?? defaultFavicon;
+    }
+  }, [brandName, brandLogo]);
+  return null;
+}
 
 // Sane defaults: caches are fresh for 30s and we don't refetch the world on
 // every focus event. Individual queries can opt-in to tighter staleness.
@@ -185,6 +199,7 @@ const AppRoutes = () => (
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
+    <BrandingEffects />
     <LanguageProvider>
       <AuthProvider>
         <TooltipProvider>

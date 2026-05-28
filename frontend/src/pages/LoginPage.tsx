@@ -1,15 +1,16 @@
 import { useState } from "react";
-import { User, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
-import logoImg from "@/assets/logo.png";
+import { User, Lock, Eye, EyeOff, ArrowRight, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { useLanguage } from "@/hooks/use-language";
+import { useBranding } from "@/hooks/use-branding";
 import { toast } from "sonner";
 
 export default function LoginPage() {
   const { login } = useAuth();
   const { t } = useLanguage();
+  const { brandName, brandLogo } = useBranding();
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -40,8 +41,11 @@ export default function LoginPage() {
         <div className="w-full max-w-[400px]">
           {/* Mobile logo */}
           <div className="flex items-center gap-2.5 mb-10 lg:hidden animate-[slideDown_0.5s_ease-out]">
-            <img src={logoImg} alt={t("login.brandAlt")} className="h-10 w-10 rounded-xl object-cover" />
-            <span className="text-xl font-bold text-foreground">{t("login.brandName")}</span>
+            {brandLogo
+              ? <img src={brandLogo} alt={brandName} className="h-10 w-10 rounded-xl object-cover" />
+              : <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center"><Building2 className="h-5 w-5 text-primary" /></div>
+            }
+            <span className="text-xl font-bold text-foreground">{brandName}</span>
           </div>
 
           <div className="mb-8 animate-[fadeSlideUp_0.5s_ease-out_both]">

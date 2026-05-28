@@ -4,6 +4,7 @@ from app.api.v1 import (
     analytics,
     attendance,
     auth,
+    branding,
     courses,
     dashboard,
     finance,
@@ -21,6 +22,7 @@ from app.api.v1 import (
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth.router)
+api_router.include_router(branding.router)
 api_router.include_router(courses.router)
 api_router.include_router(rooms.router)
 api_router.include_router(teachers.router)

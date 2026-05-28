@@ -16,14 +16,15 @@ import {
   Wallet,
   PenSquare,
   Briefcase,
+  Building2,
   type LucideIcon,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/use-auth";
+import { useBranding } from "@/hooks/use-branding";
 import type { UserRole } from "@/types/auth";
-import logoImg from "@/assets/logo.png";
 import {
   studentSidebarAcademicItems,
   studentSidebarFinanceItems,
@@ -120,6 +121,7 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { logout, user } = useAuth();
+  const { brandName, brandLogo } = useBranding();
   const role = user?.role;
   const isActive = (path: string) => location.pathname === path;
 
@@ -167,11 +169,14 @@ export function AppSidebar() {
       <SidebarHeader className="p-5 pb-4">
         <div className={`flex items-center ${collapsed ? "justify-center" : "gap-3"}`}>
           <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 ring-2 ring-primary/10 overflow-hidden">
-            <img src={logoImg} alt="IELTS Imperia" className="h-full w-full object-cover" />
+            {brandLogo
+              ? <img src={brandLogo} alt={brandName} className="h-full w-full object-cover" />
+              : <Building2 className="h-5 w-5 text-primary" />
+            }
           </div>
           {!collapsed && (
             <div className="flex flex-col">
-              <span className="text-base font-extrabold text-foreground tracking-tight font-display">IELTS Imperia</span>
+              <span className="text-base font-extrabold text-foreground tracking-tight font-display">{brandName}</span>
               <span className="text-[11px] text-muted-foreground font-medium">
                 {role === "teacher"
                   ? t("sidebar.teacher_panel")

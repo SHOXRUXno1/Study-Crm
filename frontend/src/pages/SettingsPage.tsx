@@ -10,20 +10,21 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { User, Bell, Palette, Shield, Globe, Save, Camera, Trash2, Monitor, Loader2 } from "lucide-react";
+import { User, Bell, Palette, Shield, Globe, Save, Camera, Trash2, Monitor, Loader2, Building2 } from "lucide-react";
 import { DevicesTab } from "@/components/settings/DevicesTab";
 import { NotificationsTab } from "@/components/settings/NotificationsTab";
 import { languageNames, type Language } from "@/hooks/use-language";
 import { toast } from "sonner";
 import { useAdminProfile, useUpdateProfile, useChangePassword } from "@/hooks/use-admin-profile";
 import { useAuth } from "@/hooks/use-auth";
+import { useBranding, useBrandingRaw, useUpdateBranding } from "@/hooks/use-branding";
 
 export default function SettingsPage() {
   const { t, language, setLanguage } = useLanguage();
   const { theme, toggleTheme } = useTheme();
-
   // ── Profile data from API ─────────────────────────────────────────────────
-  const { refreshProfile } = useAuth();
+  const { refreshProfile, user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const { data: profile, isLoading: profileLoading } = useAdminProfile();
   const updateProfile = useUpdateProfile();
   const changePassword = useChangePassword();
@@ -100,6 +101,64 @@ export default function SettingsPage() {
   const [newPassword,     setNewPassword]     = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  // ── Branding state ────────────────────────────────────────────────────────
+  const branding = useBranding();
+  const rawBranding = useBrandingRaw();
+  const updateBranding = useUpdateBranding();
+  const [brandNameInput,    setBrandNameInput]    = useState("");
+  const [brandLogoBase64,   setBrandLogoBase64]   = useState<string | null>(null);
+  const [brandLogoChanged,  setBrandLogoChanged]  = useState(false);
+  const [brandLogoRemoved,  setBrandLogoRemoved]  = useState(false);
+  const brandLogoInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync inputs once raw DB data arrives (null → empty field, not fallback text)
+  useEffect(() => {
+    setBrandNameInput(rawBranding?.brand_name ?? "");
+  }, [rawBranding?.brand_name]);
+
+  function handleBrandLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const allowed = ["image/png", "image/jpeg", "image/svg+xml", "image/webp"];
+    if (!allowed.includes(file.type)) {
+      toast.error(t("settings.brandLogoInvalidType"));
+      return;
+    }
+    if (file.size > 512 * 1024) {
+      toast.error(t("settings.brandLogoTooLarge"));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setBrandLogoBase64(ev.target?.result as string);
+      setBrandLogoChanged(true);
+      setBrandLogoRemoved(false);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function handleBrandLogoRemove() {
+    setBrandLogoBase64(null);
+    setBrandLogoRemoved(true);
+    setBrandLogoChanged(true);
+    if (brandLogoInputRef.current) brandLogoInputRef.current.value = "";
+  }
+
+  async function handleSaveBranding() {
+    try {
+      await updateBranding.mutateAsync({
+        brand_name: brandNameInput.trim() || null,
+        brand_logo_base64: brandLogoChanged ? brandLogoBase64 : null,
+        logo_set: brandLogoChanged,
+      });
+      setBrandLogoChanged(false);
+      setBrandLogoRemoved(false);
+      toast.success(t("settings.brandingSaved"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("settingsPage.profileSaveError"));
+    }
+  }
+
   async function handleUpdatePassword() {
     if (newPassword !== confirmPassword) {
       toast.error(t("settingsPage.passwordMismatch"));
@@ -148,6 +207,11 @@ export default function SettingsPage() {
             <TabsTrigger value="devices" className="gap-1.5 sm:gap-2 text-xs flex-1 sm:flex-none">
               <Monitor className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{t("settings.devices")}</span>
             </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="branding" className="gap-1.5 sm:gap-2 text-xs flex-1 sm:flex-none">
+                <Building2 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{t("settings.branding")}</span>
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* ── Profile Tab ── */}
@@ -365,6 +429,87 @@ export default function SettingsPage() {
           <TabsContent value="devices">
             <DevicesTab />
           </TabsContent>
+
+          {/* ── Branding Tab (admin-only) ── */}
+          {isAdmin && (
+            <TabsContent value="branding" className="space-y-6 animate-fade-in">
+              <div className="stat-card space-y-6">
+                <div>
+                  <h3 className="text-base font-semibold text-foreground">{t("settings.branding")}</h3>
+                  <p className="text-xs text-muted-foreground mt-1">{t("settings.brandingDesc")}</p>
+                </div>
+                <Separator />
+
+                {/* Logo */}
+                <div className="flex flex-col items-center gap-3">
+                  <input
+                    ref={brandLogoInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                    className="hidden"
+                    onChange={handleBrandLogoChange}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => brandLogoInputRef.current?.click()}
+                    className="relative group w-[120px] h-[120px] rounded-2xl overflow-hidden ring-2 ring-primary/20 transition-all hover:ring-primary/50 bg-muted/30 flex items-center justify-center"
+                  >
+                    {(() => {
+                      const effectiveLogo = brandLogoRemoved ? null : (brandLogoBase64 ?? branding.brandLogo);
+                      return effectiveLogo
+                        ? <img src={effectiveLogo} alt={brandNameInput || branding.brandName} className="w-full h-full object-contain p-2 transition-transform duration-300 group-hover:scale-105" />
+                        : <Building2 className="h-10 w-10 text-muted-foreground" />;
+                    })()}
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <Camera className="h-6 w-6 text-white" />
+                    </div>
+                  </button>
+                  <p className="text-xs text-muted-foreground">{t("settings.brandLogoHint")}</p>
+                  <button
+                    type="button"
+                    onClick={() => brandLogoInputRef.current?.click()}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {t("settings.brandLogoUpload")}
+                  </button>
+                  {!brandLogoRemoved && (brandLogoBase64 || rawBranding?.brand_logo_base64) && (
+                    <button
+                      type="button"
+                      onClick={handleBrandLogoRemove}
+                      className="text-xs text-destructive hover:text-destructive/80 transition-colors flex items-center gap-1"
+                    >
+                      <Trash2 className="h-3 w-3" /> {t("settings.brandLogoRemove")}
+                    </button>
+                  )}
+                </div>
+
+                {/* Brand name */}
+                <div className="grid gap-2">
+                  <Label htmlFor="brandName">{t("settings.brandName")}</Label>
+                  <Input
+                    id="brandName"
+                    value={brandNameInput}
+                    onChange={(e) => setBrandNameInput(e.target.value)}
+                    placeholder={t("settings.brandNamePlaceholder")}
+                    maxLength={120}
+                  />
+                </div>
+
+                <div className="flex justify-end">
+                  <Button
+                    className="gap-2"
+                    onClick={handleSaveBranding}
+                    disabled={updateBranding.isPending}
+                  >
+                    {updateBranding.isPending
+                      ? <><Loader2 className="h-4 w-4 animate-spin" /> {t("common.saving")}</>
+                      : <><Save className="h-4 w-4" /> {t("settings.saveChanges")}</>
+                    }
+                  </Button>
+                </div>
+              </div>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </DashboardLayout>

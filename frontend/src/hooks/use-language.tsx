@@ -1652,6 +1652,19 @@ const translations: Record<string, Record<Language, string>> = {
   "settings.uploadPhoto": { en: "Upload photo", ru: "Загрузить фото", uz: "Rasm yuklash" },
   "settings.removePhoto": { en: "Remove photo", ru: "Удалить фото", uz: "Rasmni o'chirish" },
 
+  // Branding tab
+  "settings.branding":             { en: "Branding",          ru: "Брендинг",           uz: "Brending" },
+  "settings.brandingDesc":         { en: "Customize your school name and logo displayed across the app.", ru: "Настройте название и логотип школы, отображаемые в приложении.", uz: "Ilovada ko'rsatiladigan maktab nomi va logotipini sozlang." },
+  "settings.brandName":            { en: "School name",       ru: "Название школы",     uz: "Maktab nomi" },
+  "settings.brandNamePlaceholder": { en: "", ru: "", uz: "" },
+  "settings.brandLogo":            { en: "Logo",              ru: "Логотип",            uz: "Logotip" },
+  "settings.brandLogoHint":        { en: "PNG, JPG, SVG or WebP · max 512 KB", ru: "PNG, JPG, SVG или WebP · максимум 512 КБ", uz: "PNG, JPG, SVG yoki WebP · maksimal 512 KB" },
+  "settings.brandLogoUpload":      { en: "Upload logo",       ru: "Загрузить логотип",  uz: "Logotip yuklash" },
+  "settings.brandLogoRemove":      { en: "Remove logo",       ru: "Удалить логотип",    uz: "Logotipni o'chirish" },
+  "settings.brandLogoTooLarge":    { en: "Logo file is too large (max 512 KB).", ru: "Файл логотипа слишком большой (максимум 512 КБ).", uz: "Logotip fayli juda katta (maksimal 512 KB)." },
+  "settings.brandLogoInvalidType": { en: "Unsupported format. Use PNG, JPG, SVG, or WebP.", ru: "Неподдерживаемый формат. Используйте PNG, JPG, SVG или WebP.", uz: "Qo'llab-quvvatlanmaydigan format. PNG, JPG, SVG yoki WebP ishlating." },
+  "settings.brandingSaved":        { en: "Branding saved successfully.", ru: "Брендинг успешно сохранён.", uz: "Brending muvaffaqiyatli saqlandi." },
+
   // Devices tab
   "devices.title": { en: "Devices", ru: "Устройства", uz: "Qurilmalar" },
   "devices.subtitle": { en: "Manage devices that are signed in to your account", ru: "Управляйте устройствами, на которых выполнен вход в ваш аккаунт", uz: "Hisobingizga kirgan qurilmalarni boshqaring" },

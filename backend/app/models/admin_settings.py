@@ -16,3 +16,5 @@ class AdminSettings(Base, TimestampMixin):
     phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
     avatar_base64: Mapped[str | None] = mapped_column(Text, nullable=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    brand_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    brand_logo_base64: Mapped[str | None] = mapped_column(Text, nullable=True)

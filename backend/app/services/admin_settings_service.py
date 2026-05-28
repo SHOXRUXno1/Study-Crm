@@ -44,3 +44,29 @@ async def update_password(db: AsyncSession, new_plain_password: str) -> None:
     row = result.scalar_one()
     row.password_hash = hash_password(new_plain_password)
     await db.commit()
+
+
+async def get_branding(db: AsyncSession) -> AdminSettings:
+    result = await db.execute(select(AdminSettings).where(AdminSettings.id == 1))
+    row = result.scalar_one_or_none()
+    if row is None:
+        # settings not created yet — return a transient object with nulls
+        return AdminSettings(id=1, password_hash="", brand_name=None, brand_logo_base64=None)
+    return row
+
+
+async def update_branding(
+    db: AsyncSession,
+    *,
+    brand_name: str | None,
+    brand_logo_base64: str | None,
+    logo_set: bool,
+) -> AdminSettings:
+    result = await db.execute(select(AdminSettings).where(AdminSettings.id == 1))
+    row = result.scalar_one()
+    row.brand_name = brand_name
+    if logo_set:
+        row.brand_logo_base64 = brand_logo_base64
+    await db.commit()
+    await db.refresh(row)
+    return row
