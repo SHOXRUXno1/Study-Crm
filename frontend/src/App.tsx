@@ -70,17 +70,25 @@ import ManagerAnalytics from "./pages/ManagerAnalytics.tsx";
 import ManagersPage from "./pages/ManagersPage.tsx";
 import ManagerSettingsPage from "./pages/ManagerSettingsPage.tsx";
 import { useBranding } from "@/hooks/use-branding";
-import defaultFavicon from "@/assets/logo.png";
+
+const DEFAULT_FAVICON = "/logo.png";
+
+function setFavicon(href: string) {
+  // Remove all existing icon links to force Chrome to release its favicon cache
+  document.querySelectorAll<HTMLLinkElement>("link[rel~='icon'], link[rel='apple-touch-icon']").forEach(el => el.remove());
+  const link = document.createElement("link");
+  link.id = "app-favicon";
+  link.rel = "icon";
+  link.type = "image/png";
+  link.href = href;
+  document.head.appendChild(link);
+}
 
 function BrandingEffects() {
   const { brandName, brandLogo } = useBranding();
   useEffect(() => {
     document.title = brandName;
-    const favicon = document.getElementById("app-favicon") as HTMLLinkElement | null;
-    const apple = document.querySelector<HTMLLinkElement>("link[rel='apple-touch-icon']");
-    const href = brandLogo ?? defaultFavicon;
-    if (favicon) favicon.href = href;
-    if (apple) apple.href = href;
+    setFavicon(brandLogo ?? DEFAULT_FAVICON);
   }, [brandName, brandLogo]);
   return null;
 }
