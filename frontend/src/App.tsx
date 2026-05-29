@@ -71,7 +71,7 @@ import ManagersPage from "./pages/ManagersPage.tsx";
 import ManagerSettingsPage from "./pages/ManagerSettingsPage.tsx";
 import { useBranding } from "@/hooks/use-branding";
 
-const DEFAULT_FAVICON = "/logo.png";
+const DEFAULT_FAVICON = "/favicon-default.svg";
 
 function setFavicon(href: string) {
   // Remove all existing icon links to force Chrome to release its favicon cache
