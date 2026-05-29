@@ -76,10 +76,11 @@ function BrandingEffects() {
   const { brandName, brandLogo } = useBranding();
   useEffect(() => {
     document.title = brandName;
-    const link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
-    if (link) {
-      link.href = brandLogo ?? defaultFavicon;
-    }
+    const favicon = document.getElementById("app-favicon") as HTMLLinkElement | null;
+    const apple = document.querySelector<HTMLLinkElement>("link[rel='apple-touch-icon']");
+    const href = brandLogo ?? defaultFavicon;
+    if (favicon) favicon.href = href;
+    if (apple) apple.href = href;
   }, [brandName, brandLogo]);
   return null;
 }
