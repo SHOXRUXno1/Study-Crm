@@ -65,6 +65,29 @@ const PAYMENT_VALUES: PaymentStatus[] = ["paid", "debt"];
 
 const DF_LOCALES: Record<string, Locale> = { ru: ruLocale, uz: uzLocale, en: enLocale };
 
+function mapStudentApiError(e: unknown, t: (key: string) => string): string {
+  if (!(e instanceof ApiError)) return t("common.unknownError");
+
+  const msg = (typeof e.detail === "string" ? e.detail : e.message ?? "").toLowerCase();
+
+  // Phone validation errors from backend
+  if (msg.includes("phone must contain at least")) return t("students.errorPhoneTooShort");
+  if (msg.includes("phone") && msg.includes("digit"))   return t("students.errorPhoneDigits");
+  if (msg.includes("phone") && (msg.includes("invalid") || msg.includes("format")))
+    return t("students.errorPhoneInvalid");
+
+  // Duplicate / conflict
+  if (e.status === 409 || msg.includes("already exists") || msg.includes("duplicate"))
+    return t("students.errorDuplicate");
+
+  // Server errors
+  if (e.status >= 500) return t("common.serverError");
+
+  // Fallback: show detail if it's a short readable string, else generic
+  if (typeof e.detail === "string" && e.detail.length < 120) return e.detail;
+  return t("common.unknownError");
+}
+
 export default function Students() {
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -787,7 +810,7 @@ function StudentDialog({
       }
       onClose();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : t("common.unknownError"));
+      toast.error(mapStudentApiError(e, t));
     }
   }
 
