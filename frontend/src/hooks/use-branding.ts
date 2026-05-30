@@ -22,7 +22,7 @@ const QK = ["branding"] as const;
 
 function resolve(data: BrandingData | undefined): Branding {
   return {
-    brandName: data?.brand_name || "IELTS Imperia",
+    brandName: data?.brand_name || "School CRM",
     brandLogo: data?.brand_logo_base64 ?? null,
   };
 }

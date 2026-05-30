@@ -69,7 +69,7 @@ import ManagerDashboard from "./pages/ManagerDashboard.tsx";
 import ManagerAnalytics from "./pages/ManagerAnalytics.tsx";
 import ManagersPage from "./pages/ManagersPage.tsx";
 import ManagerSettingsPage from "./pages/ManagerSettingsPage.tsx";
-import { useBranding } from "@/hooks/use-branding";
+import { useBranding, useBrandingRaw } from "@/hooks/use-branding";
 
 const DEFAULT_FAVICON = "/favicon-default.svg";
 
@@ -85,11 +85,15 @@ function setFavicon(href: string) {
 }
 
 function BrandingEffects() {
+  const raw = useBrandingRaw();          // undefined while loading
   const { brandName, brandLogo } = useBranding();
   useEffect(() => {
+    // Don't overwrite the neutral HTML title until the API responds,
+    // so the browser never flashes "IELTS Imperia" from the fallback.
+    if (raw === undefined) return;
     document.title = brandName;
     setFavicon(brandLogo ?? DEFAULT_FAVICON);
-  }, [brandName, brandLogo]);
+  }, [raw, brandName, brandLogo]);
   return null;
 }
 
