@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
-import { useLanguage, languageNames, type Language } from "@/hooks/use-language";
+import { useLanguage } from "@/hooks/use-language";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/hooks/use-auth";
 import { apiClient } from "@/lib/api";
@@ -37,7 +38,7 @@ interface ManagerProfileApi {
 const PROFILE_QK = ["auth", "profile", "manager"];
 
 export default function ManagerSettingsPage() {
-  const { t, language, setLanguage } = useLanguage();
+  const { t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
   const { refreshProfile } = useAuth();
   const qc = useQueryClient();
@@ -319,17 +320,7 @@ export default function ManagerSettingsPage() {
                   <p className="text-sm font-medium text-foreground">{t("settings.language")}</p>
                   <p className="text-xs text-muted-foreground">{t("settings.languageDesc")}</p>
                 </div>
-                <Select value={language} onValueChange={(v) => setLanguage(v as Language)}>
-                  <SelectTrigger className="w-40 gap-2">
-                    <Globe className="h-3.5 w-3.5" />
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(["en", "ru", "uz"] as Language[]).map((lang) => (
-                      <SelectItem key={lang} value={lang}>{languageNames[lang]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <LanguageSwitcher size="md" />
               </div>
             </div>
           </TabsContent>

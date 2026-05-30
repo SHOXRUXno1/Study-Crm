@@ -1,10 +1,10 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { Search, Sun, Moon, Globe, Settings, LogOut } from "lucide-react";
+import { Search, Sun, Moon, Settings, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useTheme } from "@/hooks/use-theme";
-import { useLanguage, languageNames, type Language } from "@/hooks/use-language";
+import { useLanguage } from "@/hooks/use-language";
 import { NotificationPanel } from "@/components/NotificationPanel";
 import { CommandSearch } from "@/components/CommandSearch";
 import { useNavigate } from "react-router-dom";
@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useNotificationsStream } from "@/hooks/use-notifications-stream";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { StudentMobileNav } from "@/components/StudentMobileNav";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,11 +20,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const languages: Language[] = ["en", "ru", "uz"];
-
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { theme, toggleTheme } = useTheme();
-  const { language, setLanguage, t } = useLanguage();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const { logout, user, isAuthenticated } = useAuth();
   const isStudent = user?.role === "student";
@@ -68,25 +67,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 </Button>
               )}
 
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-xl">
-                    <Globe className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-[140px] rounded-xl">
-                  {languages.map((lang) => (
-                    <DropdownMenuItem
-                      key={lang}
-                      onClick={() => setLanguage(lang)}
-                      className={`rounded-lg ${language === lang ? "bg-accent font-medium" : ""}`}
-                    >
-                      <span className="text-xs font-semibold uppercase w-6">{lang}</span>
-                      <span className="text-sm">{languageNames[lang]}</span>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <LanguageSwitcher size="sm" />
 
               <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-xl" onClick={toggleTheme}>
                 {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}

@@ -5,17 +5,16 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { studentPrimaryTabs } from "@/config/student-nav";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { useLanguage, languageNames, type Language } from "@/hooks/use-language";
+import { useLanguage } from "@/hooks/use-language";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
-
-const languages: Language[] = ["en", "ru", "uz"];
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 export function StudentMobileNav() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { t, language, setLanguage } = useLanguage();
+  const { t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
   const { logout } = useAuth();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -131,19 +130,7 @@ export function StudentMobileNav() {
               <Languages className="mr-1 inline h-3 w-3" />
               {t("settings.language")}
             </p>
-            <div className="grid grid-cols-3 gap-2">
-              {languages.map((lang) => (
-                <Button
-                  key={lang}
-                  variant={language === lang ? "default" : "outline"}
-                  size="sm"
-                  className="justify-center"
-                  onClick={() => setLanguage(lang)}
-                >
-                  {languageNames[lang]}
-                </Button>
-              ))}
-            </div>
+            <LanguageSwitcher size="md" className="w-full justify-center" />
           </div>
 
           <Button

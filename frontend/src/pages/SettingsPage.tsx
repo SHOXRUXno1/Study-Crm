@@ -13,14 +13,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { User, Bell, Palette, Shield, Globe, Save, Camera, Trash2, Monitor, Loader2, Building2 } from "lucide-react";
 import { DevicesTab } from "@/components/settings/DevicesTab";
 import { NotificationsTab } from "@/components/settings/NotificationsTab";
-import { languageNames, type Language } from "@/hooks/use-language";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { toast } from "sonner";
 import { useAdminProfile, useUpdateProfile, useChangePassword } from "@/hooks/use-admin-profile";
 import { useAuth } from "@/hooks/use-auth";
 import { useBranding, useBrandingRaw, useUpdateBranding } from "@/hooks/use-branding";
 
 export default function SettingsPage() {
-  const { t, language, setLanguage } = useLanguage();
+  const { t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
   // ── Profile data from API ─────────────────────────────────────────────────
   const { refreshProfile, user } = useAuth();
@@ -358,17 +358,7 @@ export default function SettingsPage() {
                   <p className="text-sm font-medium text-foreground">{t("settings.language")}</p>
                   <p className="text-xs text-muted-foreground">{t("settings.languageDesc")}</p>
                 </div>
-                <Select value={language} onValueChange={(v) => setLanguage(v as Language)}>
-                  <SelectTrigger className="w-40 gap-2">
-                    <Globe className="h-3.5 w-3.5" />
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(["en", "ru", "uz"] as Language[]).map((lang) => (
-                      <SelectItem key={lang} value={lang}>{languageNames[lang]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <LanguageSwitcher size="md" />
               </div>
             </div>
           </TabsContent>
