@@ -638,6 +638,7 @@ const translations: Record<string, Record<Language, string>> = {
   "employees.toastCredBothOrEmpty": { en: "Provide both login and password, or leave both empty.", ru: "Укажите логин и пароль вместе или оставьте оба пустыми.", uz: "Login va parolni birga kiriting yoki ikkalasini ham bo'sh qoldiring." },
   "employees.positionLocked": { en: "Position cannot be changed when editing (different tables).", ru: "Должность нельзя изменить при редактировании.", uz: "Lavozimni tahrirlashda o'zgartirish mumkin emas." },
   "employees.totalEmployees": { en: "Total Employees", ru: "Всего сотрудников", uz: "Jami xodimlar" },
+  "employees.fioLabel": { en: "Full Name", ru: "Ф.И.О.", uz: "F.I.O." },
   // Position labels
   "position.teacher":    { en: "Teacher", ru: "Преподаватель", uz: "O'qituvchi" },
   "position.manager":    { en: "Manager", ru: "Менеджер", uz: "Menejer" },

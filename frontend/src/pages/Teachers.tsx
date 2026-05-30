@@ -72,9 +72,7 @@ const SORT_OPTIONS = [
 
 interface FormState {
   position: string;
-  first_name: string;
-  last_name: string;
-  middle_name: string;
+  fio: string;
   phone: string;
   birth_date: string;
   hire_date: string;
@@ -88,22 +86,30 @@ interface FormState {
   salary_per_student: number | null;
 }
 
+function parseFio(fio: string) {
+  const parts = fio.trim().split(/\s+/).filter(Boolean);
+  return {
+    last_name:   parts[0] ?? "",
+    first_name:  parts[1] ?? "",
+    middle_name: parts.slice(2).join(" ") || null,
+  };
+}
+
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
 const emptyForm = (): FormState => ({
   position: "teacher",
-  first_name: "", last_name: "", middle_name: "", phone: "",
+  fio: "", phone: "",
   birth_date: "", hire_date: todayIso(), gender: "",
   username: "", password: "",
   salary_monthly: 0, salary_percent: "0", salary_per_lesson: 0, salary_per_student: 0,
 });
 
 function formFromEmployee(e: Employee): FormState {
+  const fio = [e.last_name, e.first_name, e.middle_name].filter(Boolean).join(" ");
   return {
     position:     e.position,
-    first_name:   e.first_name,
-    last_name:    e.last_name,
-    middle_name:  e.middle_name ?? "",
+    fio,
     phone:        e.phone ?? "",
     birth_date:   e.birth_date ?? "",
     hire_date:    e.hire_date ?? "",
@@ -234,7 +240,8 @@ export default function Teachers() {
   };
 
   async function handleSave() {
-    if (!form.first_name.trim() || !form.last_name.trim()) return;
+    if (!form.fio.trim() || form.fio.trim().split(/\s+/).filter(Boolean).length < 2) return;
+    const { last_name, first_name, middle_name } = parseFio(form.fio);
     const newUsername = form.username.trim().toLowerCase();
     const newPassword = form.password.trim();
     const usernameProvided = newUsername.length > 0;
@@ -250,9 +257,9 @@ export default function Teachers() {
         // Update — dispatch by kind
         if (editTarget.kind === "teacher") {
           const patch: TeacherUpdate = {
-            first_name:  form.first_name.trim(),
-            last_name:   form.last_name.trim(),
-            middle_name: form.middle_name.trim() || null,
+            first_name,
+            last_name,
+            middle_name,
             phone:       form.phone.trim() || null,
             birth_date:  form.birth_date || null,
             hire_date:   form.hire_date || null,
@@ -267,9 +274,9 @@ export default function Teachers() {
           await updateTeacherM.mutateAsync({ id: editTarget.id, data: patch });
         } else {
           const patch: ManagerUpdate = {
-            first_name:  form.first_name.trim(),
-            last_name:   form.last_name.trim(),
-            middle_name: form.middle_name.trim() || null,
+            first_name,
+            last_name,
+            middle_name,
             phone:       form.phone.trim() || null,
             birth_date:  form.birth_date || null,
             hire_date:   form.hire_date || null,
@@ -284,9 +291,9 @@ export default function Teachers() {
         // Create — dispatch by position
         if (isTeacherPosition(form.position)) {
           const payload: TeacherCreate = {
-            first_name:  form.first_name.trim(),
-            last_name:   form.last_name.trim(),
-            middle_name: form.middle_name.trim() || null,
+            first_name,
+            last_name,
+            middle_name,
             phone:       form.phone.trim() || null,
             birth_date:  form.birth_date || null,
             hire_date:   form.hire_date || null,
@@ -304,9 +311,9 @@ export default function Teachers() {
             return;
           }
           const payload: ManagerCreate = {
-            first_name:  form.first_name.trim(),
-            last_name:   form.last_name.trim(),
-            middle_name: form.middle_name.trim() || null,
+            first_name,
+            last_name,
+            middle_name,
             phone:       form.phone.trim() || null,
             username:    newUsername,
             password:    newPassword,
@@ -733,20 +740,15 @@ export default function Teachers() {
               )}
             </div>
 
-            {/* First / Last name */}
-            <div className="grid gap-1.5">
-              <Label htmlFor="ef-first">{t("teachers.firstName")} *</Label>
-              <Input id="ef-first" placeholder={t("teachers.placeholderFirstName")} value={form.first_name} onChange={(e) => setF("first_name", e.target.value)} />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="ef-last">{t("teachers.lastName")} *</Label>
-              <Input id="ef-last" placeholder={t("teachers.placeholderLastName")} value={form.last_name} onChange={(e) => setF("last_name", e.target.value)} />
-            </div>
-
-            {/* Middle name */}
+            {/* Ф.И.О. */}
             <div className="grid gap-1.5 col-span-2">
-              <Label htmlFor="ef-mid">{t("teachers.middleName")}</Label>
-              <Input id="ef-mid" placeholder={t("teachers.placeholderMiddleName")} value={form.middle_name} onChange={(e) => setF("middle_name", e.target.value)} />
+              <Label htmlFor="ef-fio">{t("employees.fioLabel")} *</Label>
+              <Input
+                id="ef-fio"
+                placeholder="Иванов Иван Иванович"
+                value={form.fio}
+                onChange={(e) => setF("fio", e.target.value)}
+              />
             </div>
 
             {/* Phone */}
@@ -841,7 +843,7 @@ export default function Teachers() {
 
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setModalOpen(false)} disabled={isSaving}>{t("common.cancel")}</Button>
-            <Button onClick={handleSave} disabled={isSaving || !form.first_name.trim() || !form.last_name.trim()}>
+            <Button onClick={handleSave} disabled={isSaving || form.fio.trim().split(/\s+/).filter(Boolean).length < 2}>
               {isSaving ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />{t("common.saving")}</> : t("common.save")}
             </Button>
           </DialogFooter>
