@@ -832,7 +832,7 @@ function StudentDialog({
                 type="button"
                 variant={gender === "male" ? "default" : "outline"}
                 size="sm"
-                className="flex-1 h-10 bg-background"
+                className="flex-1 h-10"
                 onClick={() => setGender(gender === "male" ? "none" : "male")}
               >
                 {t("students.male")}
@@ -841,7 +841,7 @@ function StudentDialog({
                 type="button"
                 variant={gender === "female" ? "default" : "outline"}
                 size="sm"
-                className="flex-1 h-10 bg-background"
+                className="flex-1 h-10"
                 onClick={() => setGender(gender === "female" ? "none" : "female")}
               >
                 {t("students.female")}
