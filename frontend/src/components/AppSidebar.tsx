@@ -66,7 +66,6 @@ const managementNav: NavItem[] = [
   { titleKey: "sidebar.teachers", url: "/teachers", icon: UserCheck,    roles: ["admin", "manager"] },
   { titleKey: "sidebar.groups",   url: "/groups",   icon: UsersRound,   roles: ["admin", "teacher", "manager"] },
   { titleKey: "sidebar.courses",  url: "/courses",  icon: BookOpen,     roles: ["admin", "manager"] },
-  { titleKey: "sidebar.managers", url: "/managers", icon: Briefcase,    roles: ["admin"] },
 ];
 
 const academicNav: NavItem[] = [
@@ -84,7 +83,6 @@ const academicNav: NavItem[] = [
 const financeNav: NavItem[] = [
   { titleKey: "sidebar.payments",    url: "/payments",    icon: CreditCard,    roles: ["admin"] },
   { titleKey: "sidebar.debtors",     url: "/debtors",     icon: AlertTriangle, roles: ["admin", "manager"] },
-  { titleKey: "salary.menu",         url: "/finance/payroll", icon: Wallet,    roles: ["admin"] },
   ...studentSidebarFinanceItems.map((item) => ({
     titleKey: item.titleKey,
     url: item.path,

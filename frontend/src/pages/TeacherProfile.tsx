@@ -188,7 +188,6 @@ export default function TeacherProfile() {
       first_name:  fFirstName.trim(),
       middle_name: fMiddle.trim() || null,
       phone:       fPhone.trim() || null,
-      is_active:   fActive,
       birth_date:  fBirthDate || null,
       hire_date:   fHireDate  || null,
       gender:      (fGender   || null) as "male" | "female" | null,
@@ -611,13 +610,7 @@ export default function TeacherProfile() {
                   ))}
                 </div>
               </div>
-              <div className="col-span-2 flex items-center justify-between rounded-lg border p-3 bg-muted/30">
-                <div>
-                  <p className="text-sm font-medium">{t("teacherProfile.activeTitle")}</p>
-                  <p className="text-xs text-muted-foreground">{t("teacherProfile.activeHint")}</p>
-                </div>
-                <Switch checked={fActive} onCheckedChange={setFActive} />
-              </div>
+              {/* Active toggle removed — handled via employee list */}
 
               {/* Salary rates ─────────────────────────────────────────── */}
               <div className="col-span-2 mt-1 rounded-lg border border-border/60 p-3 space-y-3">

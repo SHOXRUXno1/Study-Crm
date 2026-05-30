@@ -45,6 +45,8 @@ class TeacherCreate(BaseModel):
     phone: str | None = Field(None, max_length=32)
     is_active: bool = True
 
+    position: str = Field("teacher", max_length=40)
+
     birth_date: date | None = None
     hire_date: date | None = None
     gender: GenderValue = None
@@ -76,6 +78,8 @@ class TeacherUpdate(BaseModel):
     phone: str | None = Field(None, max_length=32)
     is_active: bool | None = None
 
+    position: str | None = Field(None, max_length=40)
+
     birth_date: date | None = None
     hire_date: date | None = None
     gender: GenderValue = None
@@ -106,6 +110,7 @@ class TeacherRead(BaseModel):
     middle_name: str | None
     phone: str | None
     is_active: bool
+    position: str = "teacher"
     username: str | None
     has_account: bool = False
     avatar_base64: str | None = None
@@ -140,6 +145,7 @@ class TeacherRead(BaseModel):
                 "middle_name": data.middle_name,
                 "phone": data.phone,
                 "is_active": data.is_active,
+                "position": getattr(data, "position", "teacher") or "teacher",
                 "username": data.username,
                 "has_account": bool(data.password_hash),
                 "avatar_base64": data.avatar_base64,

@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -14,13 +14,45 @@ router = APIRouter(prefix="/managers", tags=["managers"])
 
 @router.get("", response_model=ManagerListResponse)
 async def list_managers(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(1000, ge=1, le=2000),
+    is_active: bool | None = Query(None),
+    search: str | None = Query(None, description="Поиск по ФИО или телефону"),
+    sort: str = Query("newest", description="newest | oldest | az | za"),
     db: AsyncSession = Depends(get_db),
     _: AuthUser = Depends(get_current_admin),
 ):
-    res = await db.execute(select(Manager).order_by(Manager.last_name, Manager.first_name))
-    items = res.scalars().all()
-    count_res = await db.execute(select(func.count()).select_from(Manager))
-    total = count_res.scalar_one()
+    stmt = select(Manager)
+    count_stmt = select(func.count()).select_from(Manager)
+
+    if is_active is not None:
+        stmt = stmt.where(Manager.is_active == is_active)
+        count_stmt = count_stmt.where(Manager.is_active == is_active)
+
+    if search:
+        like = f"%{search}%"
+        cond = or_(
+            Manager.first_name.ilike(like),
+            Manager.last_name.ilike(like),
+            Manager.middle_name.ilike(like),
+            Manager.phone.ilike(like),
+            Manager.username.ilike(like),
+        )
+        stmt = stmt.where(cond)
+        count_stmt = count_stmt.where(cond)
+
+    if sort == "az":
+        stmt = stmt.order_by(Manager.last_name.asc(), Manager.first_name.asc())
+    elif sort == "za":
+        stmt = stmt.order_by(Manager.last_name.desc(), Manager.first_name.desc())
+    elif sort == "oldest":
+        stmt = stmt.order_by(Manager.created_at.asc())
+    else:
+        stmt = stmt.order_by(Manager.created_at.desc())
+
+    stmt = stmt.offset(skip).limit(limit)
+    items = (await db.execute(stmt)).scalars().all()
+    total = (await db.execute(count_stmt)).scalar_one()
     return ManagerListResponse(items=list(items), total=total)
 
 
@@ -41,6 +73,10 @@ async def create_manager(
         username=data.username.lower(),
         password_hash=hash_password(data.password),
         is_active=data.is_active,
+        position=data.position or "manager",
+        birth_date=data.birth_date,
+        hire_date=data.hire_date,
+        gender=data.gender,
     )
     db.add(manager)
     await db.commit()
@@ -93,6 +129,14 @@ async def update_manager(
         manager.is_active = data.is_active
     if data.password is not None:
         manager.password_hash = hash_password(data.password)
+    if data.position is not None:
+        manager.position = data.position
+    if "birth_date" in data.model_fields_set:
+        manager.birth_date = data.birth_date
+    if "hire_date" in data.model_fields_set:
+        manager.hire_date = data.hire_date
+    if "gender" in data.model_fields_set:
+        manager.gender = data.gender
 
     await db.commit()
     await db.refresh(manager)

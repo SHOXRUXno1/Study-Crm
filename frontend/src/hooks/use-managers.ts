@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api";
-import { toast } from "sonner";
 
 export interface ManagerRead {
   id: number;
@@ -10,7 +9,14 @@ export interface ManagerRead {
   phone: string | null;
   username: string;
   is_active: boolean;
+  position: string;
+  birth_date: string | null;
+  hire_date: string | null;
+  gender: "male" | "female" | null;
   avatar_base64: string | null;
+  has_account: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ManagerListResponse {
@@ -26,6 +32,10 @@ export interface ManagerCreate {
   username: string;
   password: string;
   is_active?: boolean;
+  position?: string;
+  birth_date?: string | null;
+  hire_date?: string | null;
+  gender?: string | null;
 }
 
 export interface ManagerUpdate {
@@ -36,12 +46,42 @@ export interface ManagerUpdate {
   username?: string;
   password?: string;
   is_active?: boolean;
+  position?: string;
+  birth_date?: string | null;
+  hire_date?: string | null;
+  gender?: string | null;
 }
 
-export function useManagers() {
+export interface ManagersParams {
+  skip?: number;
+  limit?: number;
+  is_active?: boolean;
+  search?: string;
+  sort?: string;
+}
+
+function buildQs(params: ManagersParams): string {
+  const q = new URLSearchParams();
+  if (params.skip      !== undefined) q.set("skip",      String(params.skip));
+  if (params.limit     !== undefined) q.set("limit",     String(params.limit));
+  if (params.is_active !== undefined) q.set("is_active", String(params.is_active));
+  if (params.search)                  q.set("search",    params.search);
+  if (params.sort)                    q.set("sort",      params.sort);
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
+
+export const managerKeys = {
+  all:   ["managers"] as const,
+  lists: () => ["managers", "list"] as const,
+  list:  (params: ManagersParams) => ["managers", "list", params] as const,
+};
+
+export function useManagers(params: ManagersParams = {}) {
   return useQuery({
-    queryKey: ["managers"],
-    queryFn: () => apiClient.get<ManagerListResponse>("/managers"),
+    queryKey: managerKeys.list(params),
+    queryFn: () => apiClient.get<ManagerListResponse>(`/managers${buildQs(params)}`),
+    staleTime: 30_000,
   });
 }
 
@@ -51,7 +91,7 @@ export function useCreateManager() {
     mutationFn: (data: ManagerCreate) =>
       apiClient.post<ManagerRead>("/managers", data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["managers"] });
+      qc.invalidateQueries({ queryKey: managerKeys.all });
     },
   });
 }
@@ -62,7 +102,7 @@ export function useUpdateManager() {
     mutationFn: ({ id, data }: { id: number; data: ManagerUpdate }) =>
       apiClient.patch<ManagerRead>(`/managers/${id}`, data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["managers"] });
+      qc.invalidateQueries({ queryKey: managerKeys.all });
     },
   });
 }
@@ -72,7 +112,7 @@ export function useDeleteManager() {
   return useMutation({
     mutationFn: (id: number) => apiClient.delete(`/managers/${id}`),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["managers"] });
+      qc.invalidateQueries({ queryKey: managerKeys.all });
     },
   });
 }

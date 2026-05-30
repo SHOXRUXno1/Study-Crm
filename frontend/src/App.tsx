@@ -189,9 +189,9 @@ const AppRoutes = () => (
 
     {/* Admin-only */}
     <Route path="/payments" element={<ProtectedRoute allowedRoles={["admin"]}><PaymentsPage /></ProtectedRoute>} />
-    <Route path="/salary" element={<ProtectedRoute allowedRoles={["admin"]}><SalaryPage /></ProtectedRoute>} />
-    <Route path="/finance/payroll" element={<ProtectedRoute allowedRoles={["admin"]}><PayrollPage /></ProtectedRoute>} />
-    <Route path="/managers" element={<ProtectedRoute allowedRoles={["admin"]}><ManagersPage /></ProtectedRoute>} />
+    <Route path="/salary" element={<Navigate to="/teachers" replace />} />
+    <Route path="/finance/payroll" element={<Navigate to="/teachers" replace />} />
+    <Route path="/managers" element={<Navigate to="/teachers" replace />} />
 
     {/* Admin + Manager */}
     <Route path="/teachers" element={<ProtectedRoute allowedRoles={["admin", "manager"]}><TeachersPage /></ProtectedRoute>} />

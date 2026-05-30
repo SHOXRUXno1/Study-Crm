@@ -17,6 +17,11 @@ class Teacher(Base, TimestampMixin):
     phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
+    # Position — always "teacher" for this table, stored for unified UI
+    position: Mapped[str] = mapped_column(
+        String(40), nullable=False, default="teacher", server_default="teacher"
+    )
+
     # Personal info
     birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     hire_date: Mapped[date | None] = mapped_column(Date, nullable=True)
