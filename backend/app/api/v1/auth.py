@@ -8,7 +8,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import get_current_admin, get_current_user
 from app.core.security import create_access_token, hash_password, verify_password
-from app.main import limiter
+from app.core.limiter import limiter
 from app.models.session import Session
 from app.models.manager import Manager
 from app.models.student import Student

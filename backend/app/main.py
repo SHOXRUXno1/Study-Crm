@@ -3,20 +3,17 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 
 from app.core.config import settings
+from app.core.limiter import limiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal, get_db
 from app.api.v1.router import api_router
 from app.services.admin_settings_service import get_or_create_settings
 from app.services.og_service import preload_index_template, render_spa_index
-
-# Global rate-limiter instance. Imported by route modules via `from app.main import limiter`.
-limiter = Limiter(key_func=get_remote_address)
 
 
 @asynccontextmanager
