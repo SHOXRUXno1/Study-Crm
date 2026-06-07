@@ -155,7 +155,9 @@ export default function LoginPage() {
           </form>
 
           <p className="text-xs text-muted-foreground text-center mt-8 animate-[fadeSlideUp_0.6s_ease-out_both]" style={{ animationDelay: "0.5s" }}>
-            {t("login.footer")}
+            {t("login.footer")
+              .replace("{{name}}", brandName)
+              .replace("{{year}}", String(new Date().getFullYear()))}
           </p>
         </div>
       </div>

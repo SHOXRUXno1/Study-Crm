@@ -1009,7 +1009,7 @@ const translations: Record<string, Record<Language, string>> = {
   "login.sendReset": { en: "Send instructions", ru: "Отправить", uz: "Yuborish" },
   "login.resetSentTitle": { en: "Password changed", ru: "Пароль изменён", uz: "Parol o'zgartirildi" },
   "login.resetSentDesc": { en: "Your password has been changed successfully.", ru: "Ваш пароль успешно изменён.", uz: "Parolingiz muvaffaqiyatli o'zgartirildi." },
-  "login.footer": { en: "© 2026 IELTS Imperia. All rights reserved.", ru: "© 2026 IELTS Imperia. Все права защищены.", uz: "© 2026 IELTS Imperia. Barcha huquqlar himoyalangan." },
+  "login.footer": { en: "© {{year}} {{name}}. All rights reserved.", ru: "© {{year}} {{name}}. Все права защищены.", uz: "© {{year}} {{name}}. Barcha huquqlar himoyalangan." },
   "login.rememberMe": { en: "Remember me for 50 days", ru: "Запомнить меня на 50 дней", uz: "50 kunga eslab qolish" },
 
   // Groups page
