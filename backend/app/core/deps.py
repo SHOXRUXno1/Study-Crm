@@ -25,17 +25,105 @@ def _unauthorized(detail: str) -> HTTPException:
     )
 
 
+async def _resolve_admin(payload: dict, db: AsyncSession) -> AuthUser:
+    sub = payload["sub"]
+    if sub != settings.ADMIN_LOGIN:
+        raise _unauthorized("Invalid credentials")
+    return AuthUser(login=settings.ADMIN_LOGIN, role="admin")
+
+
+async def _resolve_teacher(payload: dict, db: AsyncSession) -> AuthUser:
+    tid_raw = payload.get("tid")
+    if tid_raw is None:
+        raise _unauthorized("Invalid credentials")
+    try:
+        tid = int(tid_raw)
+    except (TypeError, ValueError):
+        raise _unauthorized("Invalid credentials")
+    teacher = await db.get(Teacher, tid)
+    if not teacher or not teacher.is_active or not teacher.username:
+        raise _unauthorized("Account disabled")
+    if teacher.username != payload["sub"]:
+        raise _unauthorized("Invalid credentials")
+    full_name = " ".join(
+        p for p in (teacher.last_name, teacher.first_name, teacher.middle_name) if p
+    )
+    return AuthUser(
+        login=teacher.username,
+        role="teacher",
+        id=teacher.id,
+        name=full_name or teacher.username,
+    )
+
+
+async def _resolve_student(payload: dict, db: AsyncSession) -> AuthUser:
+    sid_raw = payload.get("sid")
+    if sid_raw is None:
+        raise _unauthorized("Invalid credentials")
+    try:
+        sid = int(sid_raw)
+    except (TypeError, ValueError):
+        raise _unauthorized("Invalid credentials")
+    student = await db.get(Student, sid)
+    if (
+        not student
+        or not student.is_active
+        or not student.phone
+        or not student.password_hash
+    ):
+        raise _unauthorized("Account disabled")
+    if student.phone != payload["sub"]:
+        raise _unauthorized("Invalid credentials")
+    return AuthUser(
+        login=student.phone,
+        role="student",
+        id=student.id,
+        name=student.full_name,
+    )
+
+
+async def _resolve_manager(payload: dict, db: AsyncSession) -> AuthUser:
+    mid_raw = payload.get("mid")
+    if mid_raw is None:
+        raise _unauthorized("Invalid credentials")
+    try:
+        mid = int(mid_raw)
+    except (TypeError, ValueError):
+        raise _unauthorized("Invalid credentials")
+    manager = await db.get(Manager, mid)
+    if not manager or not manager.is_active or not manager.username:
+        raise _unauthorized("Account disabled")
+    if manager.username != payload["sub"]:
+        raise _unauthorized("Invalid credentials")
+    full_name = " ".join(
+        p for p in (manager.last_name, manager.first_name, manager.middle_name) if p
+    )
+    return AuthUser(
+        login=manager.username,
+        role="manager",
+        id=manager.id,
+        name=full_name or manager.username,
+    )
+
+
+# Dispatch table: role → resolver function
+_ROLE_RESOLVERS = {
+    "admin":   _resolve_admin,
+    "teacher": _resolve_teacher,
+    "student": _resolve_student,
+    "manager": _resolve_manager,
+}
+
+
 async def get_current_user(
     request: Request,
     token: str = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> AuthUser:
-    """Resolve the authenticated user from JWT — admin or teacher."""
     payload = decode_token(token)
     sub = payload.get("sub")
     jti = payload.get("jti")
-    # Missing role is treated as invalid (no implicit admin elevation).
-    role = payload.get("role")
+    role = payload.get("role")  # Missing role → no implicit elevation
 
     if not sub or not jti or not role:
         raise _unauthorized("Invalid credentials")
@@ -44,109 +132,23 @@ async def get_current_user(
     if not session:
         raise _unauthorized("Session revoked or expired")
 
-    if role == "admin":
-        if sub != settings.ADMIN_LOGIN:
-            raise _unauthorized("Invalid credentials")
-        await touch_session(db, session)
-        request.state.current_jti = jti
-        request.state.user_role = "admin"
-        request.state.user_id = None
-        return AuthUser(login=settings.ADMIN_LOGIN, role="admin")
+    resolver = _ROLE_RESOLVERS.get(role)
+    if resolver is None:
+        raise _unauthorized("Invalid credentials")
 
-    if role == "teacher":
-        tid_raw = payload.get("tid")
-        if tid_raw is None:
-            raise _unauthorized("Invalid credentials")
-        try:
-            tid_int = int(tid_raw)
-        except (TypeError, ValueError):
-            raise _unauthorized("Invalid credentials")
-        teacher = await db.get(Teacher, tid_int)
-        if not teacher or not teacher.is_active or not teacher.username:
-            raise _unauthorized("Account disabled")
-        if teacher.username != sub:
-            raise _unauthorized("Invalid credentials")
-        await touch_session(db, session)
-        request.state.current_jti = jti
-        request.state.user_role = "teacher"
-        request.state.user_id = teacher.id
-        full_name = " ".join(
-            p for p in (teacher.last_name, teacher.first_name, teacher.middle_name) if p
-        )
-        return AuthUser(
-            login=teacher.username,
-            role="teacher",
-            id=teacher.id,
-            name=full_name or teacher.username,
-        )
-
-    if role == "student":
-        sid_raw = payload.get("sid")
-        if sid_raw is None:
-            raise _unauthorized("Invalid credentials")
-        try:
-            sid_int = int(sid_raw)
-        except (TypeError, ValueError):
-            raise _unauthorized("Invalid credentials")
-        student = await db.get(Student, sid_int)
-        if (
-            not student
-            or not student.is_active
-            or not student.phone
-            or not student.password_hash
-        ):
-            raise _unauthorized("Account disabled")
-        if student.phone != sub:
-            raise _unauthorized("Invalid credentials")
-        await touch_session(db, session)
-        request.state.current_jti = jti
-        request.state.user_role = "student"
-        request.state.user_id = student.id
-        return AuthUser(
-            login=student.phone,
-            role="student",
-            id=student.id,
-            name=student.full_name,
-        )
-
-    if role == "manager":
-        mid_raw = payload.get("mid")
-        if mid_raw is None:
-            raise _unauthorized("Invalid credentials")
-        try:
-            mid_int = int(mid_raw)
-        except (TypeError, ValueError):
-            raise _unauthorized("Invalid credentials")
-        manager = await db.get(Manager, mid_int)
-        if not manager or not manager.is_active or not manager.username:
-            raise _unauthorized("Account disabled")
-        if manager.username != sub:
-            raise _unauthorized("Invalid credentials")
-        await touch_session(db, session)
-        request.state.current_jti = jti
-        request.state.user_role = "manager"
-        request.state.user_id = manager.id
-        full_name = " ".join(
-            p for p in (manager.last_name, manager.first_name, manager.middle_name) if p
-        )
-        return AuthUser(
-            login=manager.username,
-            role="manager",
-            id=manager.id,
-            name=full_name or manager.username,
-        )
-
-    raise _unauthorized("Invalid credentials")
+    user = await resolver(payload, db)
+    await touch_session(db, session)
+    request.state.current_jti = jti
+    request.state.user_role = role
+    request.state.user_id = getattr(user, "id", None)
+    return user
 
 
 async def get_current_admin(
     user: AuthUser = Depends(get_current_user),
 ) -> AuthUser:
     if user.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required",
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
     return user
 
 
@@ -154,10 +156,7 @@ async def get_current_teacher(
     user: AuthUser = Depends(get_current_user),
 ) -> AuthUser:
     if user.role != "teacher":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Teacher access required",
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Teacher access required")
     return user
 
 
@@ -165,10 +164,7 @@ async def get_current_student(
     user: AuthUser = Depends(get_current_user),
 ) -> AuthUser:
     if user.role != "student":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Student access required",
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Student access required")
     return user
 
 
@@ -176,10 +172,7 @@ async def get_current_manager(
     user: AuthUser = Depends(get_current_user),
 ) -> AuthUser:
     if user.role != "manager":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Manager access required",
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Manager access required")
     return user
 
 

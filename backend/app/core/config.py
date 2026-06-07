@@ -45,6 +45,16 @@ class Settings(BaseSettings):
     RECEIPT_MAX_SIZE_MB: int = 10
     RECEIPT_MAX_FILES_PER_PAYMENT: int = 5
 
+    # Public URL used in og:image (Telegram requires absolute URLs).
+    # Example: https://crm.example.com
+    PUBLIC_BASE_URL: str = ""
+
+    # Internal URL of the frontend nginx container (docker compose DNS name).
+    FRONTEND_INTERNAL_URL: str = "http://frontend"
+
+    # Optional local fallback for SPA index.html (dev / tests).
+    STATIC_INDEX_PATH: str = "app/static/index.html"
+
     # Tells the app whether dev defaults are tolerated.
     # Production / staging deployments must set ENV=production explicitly.
     ENV: str = "development"

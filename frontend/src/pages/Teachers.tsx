@@ -720,26 +720,6 @@ export default function Teachers() {
           </DialogHeader>
 
           <div className="grid grid-cols-2 gap-3 py-2">
-            {/* Position select — disabled when editing */}
-            <div className="col-span-2 grid gap-1.5">
-              <Label>{t("employees.positionLabel")} *</Label>
-              {editTarget ? (
-                <div className="h-9 rounded-md border border-input bg-muted/50 px-3 flex items-center text-sm text-muted-foreground">
-                  {positionLabel(form.position)}
-                  <span className="ml-2 text-xs opacity-60">({t("employees.positionLocked")})</span>
-                </div>
-              ) : (
-                <Select value={form.position} onValueChange={(v) => setF("position", v)}>
-                  <SelectTrigger className="h-9 text-sm"><SelectValue placeholder={t("employees.positionPlaceholder")} /></SelectTrigger>
-                  <SelectContent>
-                    {POSITION_OPTIONS.map((pos) => (
-                      <SelectItem key={pos} value={pos}>{positionLabel(pos)}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-
             {/* Ф.И.О. */}
             <div className="grid gap-1.5 col-span-2">
               <Label htmlFor="ef-fio">{t("employees.fioLabel")} *</Label>
@@ -784,6 +764,26 @@ export default function Teachers() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Position select — disabled when editing */}
+            <div className="col-span-2 grid gap-1.5">
+              <Label>{t("employees.positionLabel")} *</Label>
+              {editTarget ? (
+                <div className="h-9 rounded-md border border-input bg-muted/50 px-3 flex items-center text-sm text-muted-foreground">
+                  {positionLabel(form.position)}
+                  <span className="ml-2 text-xs opacity-60">({t("employees.positionLocked")})</span>
+                </div>
+              ) : (
+                <Select value={form.position} onValueChange={(v) => setF("position", v)}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue placeholder={t("employees.positionPlaceholder")} /></SelectTrigger>
+                  <SelectContent>
+                    {POSITION_OPTIONS.map((pos) => (
+                      <SelectItem key={pos} value={pos}>{positionLabel(pos)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             {/* Salary block — only for teacher position */}

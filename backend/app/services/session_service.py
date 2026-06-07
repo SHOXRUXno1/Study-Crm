@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -8,6 +10,8 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.session import Session
+
+logger = logging.getLogger(__name__)
 
 
 def generate_jti() -> str:
@@ -36,7 +40,6 @@ async def lookup_ip_location(ip: str | None) -> dict:
     result = {"city": None, "country": None}
     if not ip:
         return result
-    # Пропускаем локальные адреса
     if (
         ip.startswith("127.")
         or ip == "localhost"
@@ -57,6 +60,27 @@ async def lookup_ip_location(ip: str | None) -> dict:
     return result
 
 
+async def _fill_geo_background(session_id: int, ip: str | None) -> None:
+    """Resolve geo for `ip` and write it back to the session row.
+
+    Fire-and-forget: login response is not blocked by the ipapi.co call.
+    """
+    try:
+        geo = await lookup_ip_location(ip)
+        if not any(geo.values()):
+            return
+        from app.core.database import AsyncSessionLocal
+        async with AsyncSessionLocal() as db:
+            await db.execute(
+                update(Session)
+                .where(Session.id == session_id)
+                .values(**geo)
+            )
+            await db.commit()
+    except Exception:
+        logger.debug("geo background fill failed for session %s", session_id, exc_info=True)
+
+
 async def create_session(
     db: AsyncSession,
     *,
@@ -67,7 +91,6 @@ async def create_session(
     role: str,
 ) -> Session:
     ua_info = parse_user_agent(user_agent)
-    geo = await lookup_ip_location(ip_address)
     now = datetime.now(timezone.utc)
     session = Session(
         jti=jti,
@@ -76,12 +99,17 @@ async def create_session(
         user_agent=user_agent[:500] if user_agent else None,
         ip_address=ip_address,
         last_active_at=now,
+        city=None,
+        country=None,
         **ua_info,
-        **geo,
     )
     db.add(session)
     await db.commit()
     await db.refresh(session)
+
+    # Resolve geolocation without blocking the login response.
+    asyncio.ensure_future(_fill_geo_background(session.id, ip_address))
+
     return session
 
 
@@ -96,16 +124,11 @@ TOUCH_DEBOUNCE_SECONDS = 30
 
 
 async def touch_session(db: AsyncSession, session: Session) -> None:
-    """Update session.last_active_at, but at most once every TOUCH_DEBOUNCE_SECONDS.
-
-    Without debouncing this commits on every authenticated request, which is a
-    huge write amplification (login → 1 commit per API hit). With debouncing we
-    keep "last activity" usefully fresh while collapsing burst traffic.
-    """
+    """Update last_active_at at most once every TOUCH_DEBOUNCE_SECONDS to avoid
+    write amplification on every authenticated request."""
     now = datetime.now(timezone.utc)
     last = session.last_active_at
     if last is not None:
-        # Compare in UTC. If the column is naïve (legacy data), assume UTC.
         if last.tzinfo is None:
             last = last.replace(tzinfo=timezone.utc)
         if (now - last).total_seconds() < TOUCH_DEBOUNCE_SECONDS:
@@ -117,7 +140,6 @@ async def touch_session(db: AsyncSession, session: Session) -> None:
 async def list_active_sessions(
     db: AsyncSession, *, subject: str, role: str
 ) -> list[Session]:
-    """Sessions owned by the given user (subject + role pair)."""
     result = await db.execute(
         select(Session)
         .where(
@@ -138,9 +160,8 @@ async def revoke_session(
     role: str | None = None,
 ) -> bool:
     """Revoke by id; if subject+role provided, only owner can revoke."""
-    stmt = (
-        update(Session)
-        .where(Session.id == session_id, Session.revoked_at.is_(None))
+    stmt = update(Session).where(
+        Session.id == session_id, Session.revoked_at.is_(None)
     )
     if subject is not None and role is not None:
         stmt = stmt.where(Session.subject == subject, Session.role == role)

@@ -204,6 +204,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    // Best-effort: revoke session on the server. Fire-and-forget — we clear
+    // the local state immediately regardless of the outcome so the user is
+    // never stuck on a failed network call.
+    apiClient.post("/auth/logout").catch(() => {});
     clearToken();
     setUser(null);
   };

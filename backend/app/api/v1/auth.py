@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import get_current_admin, get_current_user
 from app.core.security import create_access_token, hash_password, verify_password
+from app.main import limiter
 from app.models.session import Session
 from app.models.manager import Manager
 from app.models.student import Student
@@ -42,12 +43,26 @@ from app.services.session_service import (
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+# ── Login helpers ──────────────────────────────────────────────────────────
+
+def _make_token(subject: str, jti: str, remember_me: bool, extra_claims: dict) -> str:
+    expires = timedelta(days=50) if remember_me else None
+    return create_access_token(
+        subject=subject, jti=jti, expires_delta=expires, extra_claims=extra_claims
+    )
+
+
+def _full_name(*parts: str | None) -> str:
+    return " ".join(p for p in parts if p)
+
+
 # ── Login ──────────────────────────────────────────────────────────────────
 
 @router.post("/login", response_model=TokenResponse)
+@limiter.limit("10/minute")
 async def login(
-    credentials: LoginRequest,
     request: Request,
+    credentials: LoginRequest,
     db: AsyncSession = Depends(get_db),
 ):
     raw_login = credentials.login.strip()
@@ -55,42 +70,55 @@ async def login(
 
     user_agent = request.headers.get("user-agent")
     xff = request.headers.get("x-forwarded-for")
-    ip = (
-        xff.split(",")[0].strip() if xff else (request.client.host if request.client else None)
-    )
+    ip = xff.split(",")[0].strip() if xff else (request.client.host if request.client else None)
 
-    # 1) Try admin
+    async def _make_session(subject: str, role: str) -> str:
+        jti = generate_jti()
+        await create_session(db, jti=jti, user_agent=user_agent, ip_address=ip,
+                             subject=subject, role=role)
+        return jti
+
+    # ── 1) Admin — checked first so it never hits the DB tables ──────────
     if lowered == settings.ADMIN_LOGIN.lower():
         admin_row = await get_or_create_settings(db, settings.ADMIN_PASSWORD)
         if not verify_password(credentials.password, admin_row.password_hash):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid login or password",
-            )
-
-        jti = generate_jti()
-        await create_session(
-            db,
-            jti=jti,
-            user_agent=user_agent,
-            ip_address=ip,
-            subject=settings.ADMIN_LOGIN,
-            role="admin",
-        )
-        expires = timedelta(days=50) if credentials.remember_me else None
-        token = create_access_token(
-            subject=settings.ADMIN_LOGIN,
-            jti=jti,
-            expires_delta=expires,
-            extra_claims={"role": "admin"},
-        )
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                                detail="Invalid login or password")
+        jti = await _make_session(settings.ADMIN_LOGIN, "admin")
         return TokenResponse(
-            access_token=token,
+            access_token=_make_token(settings.ADMIN_LOGIN, jti,
+                                     credentials.remember_me, {"role": "admin"}),
             token_type="bearer",
             user=AuthUser(login=settings.ADMIN_LOGIN, role="admin"),
         )
 
-    # 2) Try teacher
+    # ── 2) Student — phone format means it can only be a student ─────────
+    #    Try this before teacher/manager to avoid two unnecessary queries for
+    #    the most common user type.
+    student_login = normalise_phone(raw_login)
+    if student_login:
+        res = await db.execute(select(Student).where(Student.phone == student_login))
+        student = res.scalar_one_or_none()
+        if (
+            student is not None
+            and student.is_active
+            and student.password_hash
+            and verify_password(credentials.password, student.password_hash)
+        ):
+            jti = await _make_session(student.phone, "student")
+            return TokenResponse(
+                access_token=_make_token(student.phone, jti, credentials.remember_me,
+                                         {"role": "student", "sid": student.id}),
+                token_type="bearer",
+                user=AuthUser(login=student.phone, role="student",
+                              id=student.id, name=student.full_name),
+            )
+        # Phone format but no matching student → reject immediately.
+        # (teachers/managers never have phone-format usernames)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Invalid login or password")
+
+    # ── 3) Teacher ────────────────────────────────────────────────────────
     res = await db.execute(select(Teacher).where(Teacher.username == lowered))
     teacher = res.scalar_one_or_none()
     if (
@@ -99,77 +127,17 @@ async def login(
         and teacher.password_hash
         and verify_password(credentials.password, teacher.password_hash)
     ):
-        jti = generate_jti()
-        await create_session(
-            db,
-            jti=jti,
-            user_agent=user_agent,
-            ip_address=ip,
-            subject=teacher.username,
-            role="teacher",
-        )
-        full_name = " ".join(
-            p for p in (teacher.last_name, teacher.first_name, teacher.middle_name) if p
-        )
-        expires = timedelta(days=50) if credentials.remember_me else None
-        token = create_access_token(
-            subject=teacher.username,
-            jti=jti,
-            expires_delta=expires,
-            extra_claims={"role": "teacher", "tid": teacher.id},
-        )
+        jti = await _make_session(teacher.username, "teacher")
+        name = _full_name(teacher.last_name, teacher.first_name, teacher.middle_name)
         return TokenResponse(
-            access_token=token,
+            access_token=_make_token(teacher.username, jti, credentials.remember_me,
+                                     {"role": "teacher", "tid": teacher.id}),
             token_type="bearer",
-            user=AuthUser(
-                login=teacher.username,
-                role="teacher",
-                id=teacher.id,
-                name=full_name or teacher.username,
-            ),
+            user=AuthUser(login=teacher.username, role="teacher",
+                          id=teacher.id, name=name or teacher.username),
         )
 
-    # 3) Try student — login is the (normalised) phone.
-    student_login = normalise_phone(raw_login)
-    if student_login:
-        res = await db.execute(
-            select(Student).where(Student.phone == student_login)
-        )
-        student = res.scalar_one_or_none()
-        if (
-            student is not None
-            and student.is_active
-            and student.password_hash
-            and verify_password(credentials.password, student.password_hash)
-        ):
-            jti = generate_jti()
-            await create_session(
-                db,
-                jti=jti,
-                user_agent=user_agent,
-                ip_address=ip,
-                subject=student.phone,
-                role="student",
-            )
-            expires = timedelta(days=50) if credentials.remember_me else None
-            token = create_access_token(
-                subject=student.phone,
-                jti=jti,
-                expires_delta=expires,
-                extra_claims={"role": "student", "sid": student.id},
-            )
-            return TokenResponse(
-                access_token=token,
-                token_type="bearer",
-                user=AuthUser(
-                    login=student.phone,
-                    role="student",
-                    id=student.id,
-                    name=student.full_name,
-                ),
-            )
-
-    # 4) Try manager
+    # ── 4) Manager ────────────────────────────────────────────────────────
     res = await db.execute(select(Manager).where(Manager.username == lowered))
     manager = res.scalar_one_or_none()
     if (
@@ -178,34 +146,14 @@ async def login(
         and manager.password_hash
         and verify_password(credentials.password, manager.password_hash)
     ):
-        jti = generate_jti()
-        await create_session(
-            db,
-            jti=jti,
-            user_agent=user_agent,
-            ip_address=ip,
-            subject=manager.username,
-            role="manager",
-        )
-        full_name = " ".join(
-            p for p in (manager.last_name, manager.first_name, manager.middle_name) if p
-        )
-        expires = timedelta(days=50) if credentials.remember_me else None
-        token = create_access_token(
-            subject=manager.username,
-            jti=jti,
-            expires_delta=expires,
-            extra_claims={"role": "manager", "mid": manager.id},
-        )
+        jti = await _make_session(manager.username, "manager")
+        name = _full_name(manager.last_name, manager.first_name, manager.middle_name)
         return TokenResponse(
-            access_token=token,
+            access_token=_make_token(manager.username, jti, credentials.remember_me,
+                                     {"role": "manager", "mid": manager.id}),
             token_type="bearer",
-            user=AuthUser(
-                login=manager.username,
-                role="manager",
-                id=manager.id,
-                name=full_name or manager.username,
-            ),
+            user=AuthUser(login=manager.username, role="manager",
+                          id=manager.id, name=name or manager.username),
         )
 
     raise HTTPException(
