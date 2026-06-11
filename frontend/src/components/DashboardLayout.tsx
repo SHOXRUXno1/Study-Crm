@@ -62,7 +62,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             </div>
             <div className="flex items-center gap-1">
               {!isStudent && (
-                <Button variant="ghost" size="icon" className="relative h-8 w-8 text-muted-foreground hover:text-foreground md:hidden rounded-xl">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="relative h-8 w-8 text-muted-foreground hover:text-foreground md:hidden rounded-xl"
+                  onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+                >
                   <Search className="h-4 w-4" />
                 </Button>
               )}

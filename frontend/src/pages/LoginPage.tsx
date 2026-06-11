@@ -16,14 +16,13 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      await login(phone, password, rememberMe);
+      await login(phone, password);
     } catch (err) {
       const message = t("login.error");
       setError(message);
@@ -97,44 +96,6 @@ export default function LoginPage() {
                 {error}
               </div>
             )}
-
-            {/* Remember me */}
-            <div className="flex items-center gap-2.5 animate-[fadeSlideUp_0.6s_ease-out_both]" style={{ animationDelay: "0.25s" }}>
-              <button
-                type="button"
-                role="checkbox"
-                aria-checked={rememberMe}
-                onClick={() => setRememberMe((v) => !v)}
-                className={`
-                  relative h-4.5 w-4.5 shrink-0 rounded-[4px] border transition-all duration-200
-                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40
-                  ${rememberMe
-                    ? "bg-primary border-primary shadow-[0_0_0_3px_hsl(var(--primary)/0.12)]"
-                    : "border-border/70 bg-muted/30 hover:border-primary/50 hover:bg-muted/60"}
-                `}
-                style={{ width: "1.1rem", height: "1.1rem" }}
-              >
-                {rememberMe && (
-                  <svg
-                    viewBox="0 0 12 12"
-                    fill="none"
-                    className="absolute inset-0 m-auto h-2.5 w-2.5 text-primary-foreground"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <polyline points="1.5,6 5,9.5 10.5,2.5" />
-                  </svg>
-                )}
-              </button>
-              <span
-                className="text-sm text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
-                onClick={() => setRememberMe((v) => !v)}
-              >
-                {t("login.rememberMe")}
-              </span>
-            </div>
 
             <div className="animate-[fadeSlideUp_0.6s_ease-out_both]" style={{ animationDelay: "0.3s" }}>
               <Button
